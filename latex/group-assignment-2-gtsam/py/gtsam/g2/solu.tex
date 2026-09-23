@@ -1,0 +1,9 @@
+\begin{pythoncode}
+def is_confirmed(self, current_step: int, M: int, N: int) -> bool:
+    window_start = current_step - N + 1
+    hits_in_window = sum(
+        observation.step >= window_start
+        for observation in self.supporting_observations
+    )
+    return hits_in_window >= M
+\end{pythoncode}

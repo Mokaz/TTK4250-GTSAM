@@ -1,0 +1,87 @@
+{
+    "latex-workshop.latex.outDir": "build",
+    // "latex-workshop.latex.search.rootFiles.include": [
+    //     "latex/main.tex"
+    // ],
+    "latex-workshop.latex.recipes": [
+        {
+            "name": "latexmk 🔃",
+            "tools": [
+                // "prescript",
+                "latexmk",
+                // "postscript"
+            ]
+        },
+        // {
+        //     "name": "pdflatex",
+        //     "tools": [
+        //         "pdflatex"
+        //     ]
+        // },
+    ],
+    "latex-workshop.latex.tools": [
+        {
+            "name": "latexmk",
+            "command": "latexmk",
+            "args": [
+                "-lualatex",
+                "-shell-escape",
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "-pdflatex=lualatex",
+                "-pdf",
+                "-outdir=%OUTDIR%",
+                "%DOC%"
+            ],
+            "env": {
+                "TEXINPUTS": "${workspaceFolder}//:${workspaceFolder}/env//:"
+            }
+        },
+        // {
+        //     "name": "pdflatex",
+        //     "command": "pdflatex",
+        //     "args": [
+        //         "-synctex=1",
+        //         "-interaction=nonstopmode",
+        //         "-file-line-error",
+        //         "-output-directory=%OUTDIR%",
+        //         "%DOC%"
+        //     ],
+        //     "env": {
+        //         "TEXINPUTS": "${workspaceFolder}//:${workspaceFolder}/env//:"
+        //     }
+        // },
+        {
+            "name": "prescript",
+            "command": "python",
+            "args": [
+                "%DIR%/scripts/prescript.py",
+            ]
+        },
+        {
+            "name": "postscript",
+            "command": "python",
+            "args": [
+                "%DIR%/scripts/postscript.py",
+            ]
+        }
+        
+    ],
+    "grammarly.selectors": [
+        {
+            "language": "latex",
+            "scheme": "file"
+        }
+    ],
+    "python.linting.pylintEnabled": false,
+    "python.linting.enabled": true,
+    "python.linting.flake8Enabled": true,
+    "python.linting.pylintArgs": [
+        "--disable=missing-docstring,wrong-import-position",
+    ],
+    "latex-workshop.latex.texDirs": [
+        "${workspaceDir}/assignments_text"
+    ],
+    
+}

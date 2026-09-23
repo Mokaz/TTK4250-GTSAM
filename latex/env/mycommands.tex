@@ -1,0 +1,60 @@
+\makeatletter
+\newcommand{\subtitle}[1]{\def\@subtitle{#1}}
+\newcommand{\assignmentnr}[1]{\def\@assignmentnr{#1}}
+\newcommand{\deadline}[1]{\def\@deadline{#1}}
+
+\title{TTK4250\ Sensor\ Fusion}
+
+\subtitle{\ifprintanswers Solution\ to\ \fi Assignment\ \@assignmentnr}
+\author{Lars-Christian\ Ness\ Tokle}
+
+\pagestyle{head}
+\lhead{\@title }
+\chead{\@subtitle}
+\rhead{Page {\thepage} of~\pageref{LastPage}}
+\headrule
+
+\DeclarePairedDelimiter{\pare}{\lparen}{\rparen}
+\qformat{\large {\bf Task \thequestion:} \quad \textit{\thequestiontitle} \hfill}
+
+
+
+
+\newcommand{\makemytitle}{
+	{\vspace*{0ex} \bf \huge \@title \\[1ex] \@subtitle \\[1.5ex]}
+	\ifprintanswers
+		{}
+	\else
+		{\bf Hand in:} \emph{\@deadline} on Canvas.
+		\\
+		\noindent\makebox[\linewidth]{\rule{\textwidth}{0.4pt}}
+		\\
+		\textbf{Read Python setup guide on Canvas}, it can be found under the \textit{Course Materials and Resources} module.\\
+		This assignment should be handed in on Canvas, as a PDF plus \textbf{the zip created by running \textit{create\_handin.py}}, before the deadline. \\
+		You are supposed to show how you got to each answer unless told otherwise.\\
+		If you struggle, we encourage you to ask for help from a classmate or come to the exercise class on Friday.\\[0pt]
+		\rule{\textwidth}{0.4pt}
+
+	\fi
+}
+\makeatother
+
+\definecolor{hint_color}{rgb}{0.95,0.95,0.95}
+
+\newenvironment{longhint}
+{\begin{mdframed}[backgroundcolor=hint_color,linecolor=white,skipabove=0.5em]
+		\textit{Hint:}\xspace}
+		{\end{mdframed}}
+\newcommand{\hint}[1]{\longhint #1 \endlonghint}
+
+\newenvironment{longnote}
+{\begin{mdframed}[backgroundcolor=hint_color, linecolor=white,skipabove=0.5em]
+		\textit{Note:}\xspace}
+		{\end{mdframed}}
+
+% \newcommand{\mypart}{\pagebreak[3]\part}
+\newcommand{\breakans}{\ifprintanswers \pagebreak \fi}
+\newcommand{\breaknoans}{\ifprintanswers \else \pagebreak \fi}
+
+\renewcommand{\questionshook}{\pagebreak[3]\setlength{\itemsep}{3em}}
+\renewcommand{\partshook}{\pagebreak[3]\setlength{\itemsep}{1em}}

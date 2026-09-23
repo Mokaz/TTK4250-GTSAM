@@ -1,0 +1,49 @@
+\begin{pythoncode}
+def h(self, eta: np.ndarray) -> np.ndarray:
+    """Predict all the landmark positions in sensor frame.
+
+    Parameters
+    ----------
+    eta : np.ndarray, shape=(3 + 2 * #landmarks,)
+    The robot state and landmarks stacked.
+
+    Returns
+    -------
+    np.ndarray, shape=(2 * #landmarks,)
+    The landmarks in the sensor frame.
+    """
+    # extract states and map
+    x = eta[0:3]
+    # reshape map (2, #landmarks), m[j] is the jth landmark
+    m = eta[3:].reshape((-1, 2)).T
+
+    Rot = rotmat2d(-x[2])
+
+    # None as index ads an axis with size 1 at that position.
+    # Numpy broadcasts size 1 dimensions to any size when needed
+    delta_m = m - (x[:2, None] + Rot.T @ self.sensor_offset[:, None])
+
+    zpredcart = Rot @ delta_m
+
+    zpred_r = np.linalg.norm(zpredcart, axis=0)
+    zpred_theta = np.arctan2(zpredcart[1], zpredcart[0])
+    zpred = np.vstack((zpred_r, zpred_theta))
+
+    # TODO: remove
+    assert np.allclose(
+        zpred,
+        np.array(
+            [
+                [np.sqrt((zpredcart ** 2).sum(axis=0))],
+                [np.arctan2(zpredcart[1, :], zpredcart[0, :])],
+            ]
+        ).squeeze(),
+    )
+
+    zpred = zpred.T.ravel()
+
+    assert (
+        zpred.ndim == 1 and zpred.shape[0] == eta.shape[0] - 3
+    ), "SLAM.h: Wrong shape on zpred"
+    return zpred
+\end{pythoncode}

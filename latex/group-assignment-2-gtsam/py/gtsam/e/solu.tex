@@ -1,0 +1,32 @@
+\begin{pythoncode}
+def reorder_joint_covariance(
+    covariance: np.ndarray,
+    keys: list[int],
+    dims: list[int],
+) -> np.ndarray:
+    if len(keys) != len(dims):
+        raise ValueError(f"keys and dims must have equal length, got {len(keys)} and {len(dims)}")
+
+    total_dim = int(np.sum(dims))
+    if covariance.shape != (total_dim, total_dim):
+        raise ValueError(
+            f"covariance has shape {covariance.shape}, expected ({total_dim}, {total_dim})"
+        )
+
+    # Position of each requested key once the keys are sorted ascending, which
+    # is the order GTSAM used when it laid out the returned matrix.
+    sorted_positions = np.argsort(np.asarray(keys, dtype=np.uint64), kind="stable")
+
+    # Offset of each block inside the returned matrix.
+    offsets = np.zeros(len(keys), dtype=int)
+    offset = 0
+    for position in sorted_positions:
+        offsets[position] = offset
+        offset += dims[position]
+
+    permutation = np.concatenate(
+        [np.arange(offsets[i], offsets[i] + dims[i]) for i in range(len(keys))]
+    ).astype(int)
+
+    return covariance[np.ix_(permutation, permutation)]
+\end{pythoncode}

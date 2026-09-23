@@ -50,3 +50,7 @@ htmlcov/
 # Misc
 TODO.md
 AGENTS.md
+
+# Minted files
+**/_minted/
+*.minted

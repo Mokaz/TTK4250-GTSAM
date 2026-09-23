@@ -1,0 +1,54 @@
+\begin{pythoncode}
+def predict(
+    self, eta: np.ndarray, P: np.ndarray, z_odo: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Predict the robot state using the zOdo as odometry the corresponding 
+    state&map covariance.
+
+    Parameters
+    eta : np.ndarray, shape=(3 + 2*#landmarks,)
+    the robot state and map concatenated
+    P : np.ndarray, shape=(3 + 2*#landmarks,)*2
+    the covariance of eta
+    z_odo : np.ndarray, shape=(3,)
+    the measured odometry
+
+    Returns
+    Tuple[np.ndarray, np.ndarray], shapes= (3 + 2*#landmarks,), 
+    (3 + 2*#landmarks,)*2
+    predicted mean and covariance of eta.
+    """
+    # check inout matrix
+    assert np.allclose(P, P.T), "EKFSLAM.predict: not symmetric P input"
+    assert np.all(np.linalg.eigvals(P) >= 0
+        ), "EKFSLAM.predict: non-positive eigen values in P input"
+    assert (eta.shape * 2 == P.shape
+        ), "EKFSLAM.predict: input eta and P shape do not match"
+    etapred = np.empty_like(eta)
+
+    x = eta[:3]
+    etapred[:3] = self.f(x, z_odo)  # robot state prediction
+    etapred[3:] = eta[3:]  # landmarks: no effect
+
+    Fx = self.Fx(x, z_odo)
+    Fu = self.Fu(x, z_odo)
+
+    # evaluate covariance prediction in place to save computation
+    # only robot state changes, 
+    # so only rows and colums of robot state needs changing
+    # cov matrix layout:
+    # [[P_xx, P_xm],
+    # [P_mx, P_mm]]
+    P[:3, :3] = Fx @ P[:3, :3] @ Fx.T + \
+            Fu @ self.Q @ Fu.T  # robot cov prediction
+    P[:3, 3:] = Fx @ P[:3, 3:]  # robot-map covariance prediction
+    P[3:, :3] = P[:3, 3:].T  # map-robot covariance: transpose of the above
+
+    # etapred = np.vstack([xpred, m])import
+    assert np.allclose(P, P.T), "EKFSLAM.predict: not symmetric P"
+    assert np.all(np.linalg.eigvals(P) > 0
+        ), "EKFSLAM.predict: non-positive eigen values"
+    assert (etapred.shape * 2 == P.shape
+        ), "EKFSLAM.predict: calculated shapes does not match"
+    return etapred, P
+\end{pythoncode}

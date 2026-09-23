@@ -1,0 +1,19 @@
+\titledquestion{Two short experiments}
+\label{q:task04}
+Both of these are quick to run and belong in the report as a figure and a paragraph each. Use whichever data set makes the point most clearly.
+
+\begin{parts}
+    \part \textbf{Relinearization.} iSAM2 does not relinearize everything at every step; it relinearizes the variables whose estimates have moved enough to warrant it. The two knobs are \pythoninline{backend.relinearize_threshold} and \pythoninline{backend.relinearize_skip}.
+
+    Push both to extremes and report what happens to accuracy, consistency and runtime. Relate your results to Sec.\ 9.5.1, which explains why ISAM had to linearize as seldom as possible and why being able to restrict relinearization to the affected variables is what makes ISAM2 worthwhile.
+
+    \part \textbf{One bad association.} Set \pythoninline{association.alpha_individual} loose enough that the front-end starts making mistakes, or force a wrong association by hand, and show what a single wrong loop closure does to the map.
+
+    Then set \pythoninline{backend.robust_kernel: huber} and run the same thing again. Explain what the robust kernel does to the cost function (9.6), why that helps, and what it costs you when the associations are in fact all correct.
+
+    In your discussion, compare this with EKF-SLAM: what are your options for recovering from a wrong association in each of the two frameworks?
+\end{parts}
+
+\hfill
+
+\textit{Optional, if you have time}: \pythoninline{backend.solver: batch} re-solves the entire graph with Levenberg-Marquardt at every step instead of updating it incrementally. It is the honest implementation of (9.13), and iSAM2 is an incremental approximation of it. Run both on the simulated data set and compare the estimates and the runtimes. Do not try it on Victoria Park unless you have an afternoon to spare -- which is itself the point of Sec.\ 9.3.3.

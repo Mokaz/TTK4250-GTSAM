@@ -1,0 +1,19 @@
+\begin{pythoncode}
+def add_landmark_factor(
+    graph: gtsam.NonlinearFactorGraph,
+    pose_key: int,
+    landmark_key: int,
+    measurement: np.ndarray,
+    noise_model: gtsam.noiseModel.Base,
+) -> None:
+    measured_range, measured_bearing = float(measurement[0]), float(measurement[1])
+    graph.add(
+        gtsam.BearingRangeFactor2D(
+            pose_key,
+            landmark_key,
+            gtsam.Rot2(measured_bearing),
+            measured_range,
+            noise_model,
+        )
+    )
+\end{pythoncode}

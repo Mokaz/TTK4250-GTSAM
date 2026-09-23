@@ -1,0 +1,25 @@
+\usepackage[a4paper, margin=0.5in, top=1in, bottom=1in]{geometry}
+
+\usepackage{lastpage}
+\usepackage{parskip}
+\usepackage{amsmath, bm}
+\usepackage{amsfonts}
+% \usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
+\usepackage{mathtools}
+\usepackage{amsthm} % needed for some definitions in new-commands, TODO: add \RequirePackage{...} into new-commands
+\usepackage{pgfplots}\pgfplotsset{compat=1.17} % needed for some definitions in new-commands
+\usepackage{xspace}
+\usepackage{xcolor}
+\usepackage{mdframed}
+
+\usepackage{fontspec}
+% If you intended Fira Code as the mono font:
+\IfFontExistsTF{Fira Code}{
+  \setmonofont[
+    Contextuals=Alternate,
+    Scale=0.85
+    ]{Fira Code}
+}{
+  \setmonofont{Latin Modern Mono} % fallback so it compiles
+}

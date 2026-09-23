@@ -1,0 +1,43 @@
+\titledquestion{Run factor graph SLAM on the Victoria Park dataset}
+\label{q:task03}
+The Victoria Park data set is a SLAM data set available along with some additional information
+\href{http://www-personal.acfr.usyd.edu.au/nebot/victoria_park.htm}{here}
+\footnote{\href{http://www-personal.acfr.usyd.edu.au/nebot/victoria_park.htm}{http://www-personal.acfr.usyd.edu.au/nebot/victoria\_park.htm}}.
+All times are converted to seconds for you in the loader, and the functions that create odometry and detections from the raw data are provided.
+
+The dataset consists of
+\begin{itemize}
+    \item LASER (mK, 361): Laser scanner returns. There are 361 returns per scan evenly divided in a half circle.
+    \item speed (K,): measured speed from a wheel encoder at the rear left wheel.
+    \item steering (K,): measured wheel steering angle
+    \item Lo\_m (Kgps,): GPS longitude in meters
+    \item La\_m (Kgps,): GPS latitude in meters
+    \item timeLsr (mK,): Time of laser scans in milliseconds
+    \item timeOdo (K,): Time of odometry measurements in milliseconds
+    \item timeGps (Kgps,): Time of GPS measurements in milliseconds
+\end{itemize}
+
+Similar as in the previous task we have given you pretty good initial tuning values (in \pythoninline{configs/real_default.yaml}). In the same way as previously, we want you to find 3 different sets of tuning values that differ in different ways and explain the results you get using them.
+
+See the linked webpage and the files in the Victoria Park folder for further information.
+The same reasoning applies to NIS and tuning here as in the simulated dataset.
+
+Note that you can use the GPS as a sort of ground truth, but it is very much less than perfect.
+You might want to use a NIS calculation instead of NEES calculation if you do that.
+Some comparison to the GPS is, however, expected.
+
+\hfill
+
+In addition, we want a plot of the \emph{per-step runtime}, split into its three components (data association, covariance recovery and optimization), against the number of landmarks in the map. Every run logs these automatically. Discuss which term dominates and why, and connect what you see to Sec.\ 9.3.2, 9.3.3 and 9.5.1 -- reordering, incremental updates, and restricting relinearization are all answers to a cost that this plot makes visible.
+
+\hfill
+
+Some questions to help discussion (not mandatory to answer):
+\begin{itemize}
+    \item Which types of errors do you see?
+    \item Is this different on the real data set compared to the simulated one? Why do you think this is so?
+    \item What happens to the estimate of the whole trajectory when a loop is closed?
+    \item Would you say that there are any shortcomings of the algorithm on this data set?
+    \item What is your general take on graph-based SLAM on data like this, compared to the EKF-SLAM you implemented previously? The book claims in Sec.\ 9.2 that (9.13) is "significantly more robust and accurate than EKF-SLAM" -- do your results support that, and for which reasons?
+    \item Can you think of any improvement strategies?
+\end{itemize}

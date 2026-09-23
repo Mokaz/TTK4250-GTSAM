@@ -1,0 +1,4 @@
+\begin{pythoncode}
+def predict_pose(previous_pose: gtsam.Pose2, relative_pose: gtsam.Pose2) -> gtsam.Pose2:
+    return previous_pose.compose(relative_pose)
+\end{pythoncode}

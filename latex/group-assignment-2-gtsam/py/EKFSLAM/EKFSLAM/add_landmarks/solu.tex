@@ -1,0 +1,57 @@
+\begin{pythoncode}
+def add_landmarks(
+    self, eta: np.ndarray, P: np.ndarray, z: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Calculate new landmarks, their covariances and add them to the state.
+
+    Parameters
+    eta : np.ndarray, shape=(3 + 2*#landmarks,)
+    the robot state and map concatenated
+    P : np.ndarray, shape=(3 + 2*#landmarks,)*2
+    the covariance of eta
+    z : np.ndarray, shape(2 * #newlandmarks,)
+    A set of measurements to create landmarks for
+
+    Returns
+    Tuple[np.ndarray, np.ndarray], 
+    shapes=(3 + 2*(#landmarks + #newlandmarks,), 
+    (3 + 2*(#landmarks + #newlandmarks,)*2
+    eta with new landmarks appended, and its covariance"""
+    n = P.shape[0]
+    assert z.ndim == 1, "SLAM.add_landmarks: z must be a 1d array"
+    numLmk = z.shape[0] // 2
+    lmnew = np.empty_like(z)
+    Gx = np.empty((numLmk * 2, 3))
+    Rall = np.zeros((numLmk * 2, numLmk * 2))
+    I2 = np.eye(2)
+    sensor_offset_world = rotmat2d(eta[2]) @ self.sensor_offset
+    sensor_offset_world_der = rotmat2d(
+        eta[2] + np.pi / 2) @ self.sensor_offset
+    for j in range(numLmk):
+        ind = 2 * j
+        inds = slice(ind, ind + 2)
+        # inds = 2 * j + np.array([0, 1])
+        zj = z[inds]
+        rot = rotmat2d(zj[1] + eta[2])
+        lmnew[inds] = zj[0] * rot[:, 0] + eta[0:2] + sensor_offset_world
+        Gx[inds, :2] = I2
+        Gx[inds, 2] = zj[0] * rot[:, 1] + sensor_offset_world_der
+        Gz = rot @ np.diag([1, zj[0]])
+        Rall[inds, inds] = Gz @ self.R @ Gz.T
+    assert len(lmnew) % 2 == 0, "SLAM.add_landmark: lmnew not even length"
+    etaadded = np.append(eta, lmnew)
+    Padded = block_diag(P, Gx @ P[:3, :3] @ Gx.T + Rall)
+    Padded[n:, :n] = Gx @ P[:3, :]
+    Padded[:n, n:] = Padded[n:, :n].T  # should yield the same as calcualion, 
+         # but this enforces symmetry and should be cheaper
+    assert (etaadded.shape * 2 == Padded.shape
+        ), "EKFSLAM.add_landmarks: calculated eta and P has wrong shape"
+    assert np.allclose(Padded, Padded.T
+        ), "EKFSLAM.add_landmarks: Padded not symmetric"
+    assert np.all(np.linalg.eigvals(Padded) >= 0
+        ), "EKFSLAM.add_landmarks: Padded not PSD"
+
+    # if not __debug__ and not np.allclose(Padded, Padded.T):
+    #     raise ValueError("EKFSLAM.add_landmarks: Padded not symmetric")
+    return etaadded, Padded
+\end{pythoncode}

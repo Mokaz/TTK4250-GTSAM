@@ -1,0 +1,32 @@
+[project]
+name = "graphslam"
+version = "1.0.0"
+description = "TTK4250 Group Assignment 2: factor graph SLAM with GTSAM"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Pinned deliberately: the joint-covariance API differs between GTSAM
+    # releases, and graphslam.factor_graph.query_joint_covariance probes for
+    # what is available. Do not add dependencies beyond this list.
+    "gtsam>=4.2,<5",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "omegaconf>=2.3",
+    "scipy>=1.11",
+    "tqdm>=4.66",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+run_sim = "graphslam.run_sim:main"
+run_real = "graphslam.run_real:main"
+plot_run = "graphslam.plotter:main"
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

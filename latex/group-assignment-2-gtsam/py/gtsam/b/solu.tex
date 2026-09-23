@@ -1,0 +1,17 @@
+\begin{pythoncode}
+def preintegrate(
+    poses: list[gtsam.Pose2],
+    covariances: list[np.ndarray],
+) -> tuple[gtsam.Pose2, np.ndarray]:
+    compounded = gtsam.Pose2.Identity()
+    compounded_cov = np.zeros((3, 3))
+
+    for increment, increment_cov in zip(poses, covariances):
+        H1 = np.zeros((3, 3), order="F")
+        H2 = np.zeros((3, 3), order="F")
+
+        compounded = compounded.compose(increment, H1, H2)
+        compounded_cov = H1 @ compounded_cov @ H1.T + H2 @ increment_cov @ H2.T
+
+    return compounded, compounded_cov
+\end{pythoncode}

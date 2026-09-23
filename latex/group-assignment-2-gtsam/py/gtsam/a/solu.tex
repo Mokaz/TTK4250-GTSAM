@@ -1,0 +1,12 @@
+\begin{pythoncode}
+def relative_pose(vel_encoder: float, steer: float, dt: float) -> gtsam.Pose2:
+    car = Car()
+
+    tangent_steer = np.tan(steer)
+    velocity_body = vel_encoder / (1.0 - (car.H / car.L) * tangent_steer)
+    yaw_rate = (velocity_body / car.L) * tangent_steer
+
+    twist_body = np.array([velocity_body, 0.0, yaw_rate], dtype=float)
+
+    return gtsam.Pose2.Expmap(twist_body * dt)
+\end{pythoncode}

@@ -1,0 +1,114 @@
+\titledquestion{Implement factor graph SLAM}
+\label{q:task01}
+Where EKF-SLAM had a \pythoninline{predict} and an \pythoninline{update}, a factor graph SLAM system has three jobs: build the graph, recover a covariance from it, and use that covariance to decide which measurement belongs to which landmark.
+The back-end (iSAM2, through GTSAM) does the optimization for you; everything below is the part it does \emph{not} do.
+
+All functions are marked with \pythoninline{# TODO} in the code, and the score is based on the number of tests passed. Run them with \pythoninline{uv run pytest}.
+
+Two conventions are worth fixing in your head before you start, because both produce systems that run happily while being wrong:
+\begin{itemize}
+    \item Measurements are ordered \([\text{range}, \text{bearing}]\) everywhere in this code base. GTSAM's \pythoninline{BearingRangeFactor2D} takes \emph{bearing first}.
+    \item The covariance GTSAM reports for a \pythoninline{Pose2}, and the Jacobians returned by \pythoninline{Pose2.range} and \pythoninline{Pose2.bearing}, both live in the \emph{tangent space} at the current estimate (Sec.\ 6.2 in the book), not in raw \((x, y, \psi)\) coordinates. Used together they are consistent. Mixing either with a hand-derived \(\partial/\partial[x, y, \psi]\) is not.
+\end{itemize}
+
+\begin{parts}
+
+    % ------------------------------------------------------------------ (a)
+    \part Implement \input{py/gtsam/a/def.tex}, which turns one wheel-encoder reading into a relative pose increment.
+
+    The Victoria Park vehicle reports a forward speed \(v_e\) measured at the left rear wheel and a steering angle \(\alpha\). The encoder sits a distance \(H\) off the centre line, so during a turn it travels along a different arc than the centre of the rear axle. With \(L\) the axle distance, the kinematic bicycle model gives the body twist
+    \begin{align*}
+        v_b    & = \frac{v_e}{1 - \frac{H}{L}\tan\alpha}, &
+        \omega & = \frac{v_b}{L}\tan\alpha,               &
+        \xi    & = \begin{bmatrix} v_b & 0 & \omega\end{bmatrix}^T.
+    \end{align*}
+    Held constant over the interval, this twist integrates \emph{exactly} to \(\Delta T = \mathrm{Exp}(\xi\,\Delta t)\), which follows a circular arc.
+
+    \begin{longhint}
+        Do not Euler-integrate into \(\begin{bmatrix} v_b\Delta t & 0 & \omega\Delta t\end{bmatrix}\) and build a \pythoninline{Pose2} from that. The difference is second order in \(\omega \Delta t\): invisible in one step, and clearly visible after a few thousand of them. The exponential map is covered in Sec.\ 6.2.3; \pythoninline{gtsam.Pose2.Expmap} implements it.
+    \end{longhint}
+    \begin{solution} \input{py/gtsam/a/solu.tex} \end{solution}
+
+    % ------------------------------------------------------------------ (b)
+    \breakans
+    \part Implement \input{py/gtsam/b/def.tex}, which compounds a sequence of relative poses into a single one, with covariance.
+
+    Wheel odometry arrives far faster than lidar scans. Rather than putting a pose in the graph for every encoder tick, all increments between two scans are compounded into one relative pose and one covariance, which enter the graph as a single \pythoninline{BetweenFactorPose2}. This is \emph{preintegration}, mentioned in Sec.\ 9.1 -- the same idea used for IMU data, in its simplest form.
+
+    The mean is repeated composition. The covariance is the interesting part: composition is nonlinear, so each increment's covariance must be pushed through the Jacobians of the composition,
+    \[
+        \Sigma \leftarrow H_1 \Sigma H_1^T + H_2 \Sigma_i H_2^T,
+    \]
+    where \(H_1\) and \(H_2\) are the Jacobians of \pythoninline{compose} with respect to its first and second argument. This is ordinary linear covariance propagation; it just happens on a manifold, so the Jacobians are those of the group operation rather than of a vector sum.
+
+    \begin{longhint}
+        \pythoninline{gtsam.Pose2.compose} fills in both Jacobians for you if you pass two preallocated \pythoninline{np.zeros((3, 3), order="F")} arrays.
+    \end{longhint}
+    \begin{solution} \input{py/gtsam/b/solu.tex} \end{solution}
+
+    % ------------------------------------------------------------------ (c)
+    \breakans
+    \part Build the graph. Each factor you add is literally one term of the negative log posterior (9.4), and therefore one term of the cost function (9.6) that the back-end minimizes.
+    \begin{subparts}
+        \subpart Implement \input{py/gtsam/c1/def.tex}, which composes a relative pose increment onto the previous pose. The odometry factor penalises \(x_k \ominus x_{k-1}\) against the measured increment (9.5), so this composition is the natural initial guess for \(x_k\) -- and a factor graph needs an initial guess, because (9.13) is a Gauss-Newton step and not a closed-form filter update.
+        \begin{solution} \input{py/gtsam/c1/solu.tex} \end{solution}
+
+        \subpart Implement \input{py/gtsam/c2/def.tex}, adding the middle term of (9.6) as a \pythoninline{BetweenFactorPose2}.
+        \begin{longhint}
+            Use \pythoninline{gtsam.noiseModel.Gaussian.Covariance} and not \pythoninline{.Sigmas}: the covariance you preintegrated in (b) is not diagonal, and discarding its off-diagonal terms is an easy way to end up over-confident and inconsistent.
+        \end{longhint}
+        \begin{solution} \input{py/gtsam/c2/solu.tex} \end{solution}
+
+        \subpart Implement \input{py/gtsam/c3/def.tex}, adding the last term of (9.6) as a \pythoninline{BearingRangeFactor2D}. Mind the argument order.
+        \begin{solution} \input{py/gtsam/c3/solu.tex} \end{solution}
+    \end{subparts}
+
+    % ------------------------------------------------------------------ (d)
+    \breakans
+    \part Implement \input{py/gtsam/d/def.tex}, the measurement function \(\mathbf{h}(x_k, m^j)\) of (9.6), together with the two blocks of the Jacobian \(\mathbf{J}\) in (9.8) belonging to this pose and this landmark.
+
+    This is the same quantity you implemented as \pythoninline{h} and \pythoninline{h_jac} in the EKF-SLAM assignment, but it is used for a different purpose: not to update a state, but to predict what the local map should look like so that the front-end can gate measurements against it.
+
+    \begin{longhint}
+        \pythoninline{gtsam.Pose2.range} and \pythoninline{gtsam.Pose2.bearing} both return their Jacobians through preallocated \pythoninline{order="F"} arrays, one row each. \pythoninline{bearing} returns a \pythoninline{gtsam.Rot2}; take \pythoninline{.theta()}.
+    \end{longhint}
+    \begin{solution} \input{py/gtsam/d/solu.tex} \end{solution}
+
+    % ------------------------------------------------------------------ (e)
+    \breakans
+    \part Implement \input{py/gtsam/e/def.tex}.
+
+    Here is the part that has no EKF-SLAM counterpart. The EKF carried \(P\) around explicitly and handed it to you. A factor graph stores \emph{information}, not covariance, so before anything can be gated the joint marginal over the current pose and the nearby landmarks has to be \emph{recovered} from the back-end. That is Sec.\ 9.4: (9.27)--(9.28) show how the pose and pose-landmark blocks are extracted by back-substitution in \(R\), and Sec.\ 9.4.2 notes that pure landmark covariances are harder still because they are spread around in \(R\). GTSAM does this for you through the Bayes tree; the function \pythoninline{query_joint_covariance} is given.
+
+    What is \emph{not} done for you is the bookkeeping. GTSAM returns the blocks of a joint marginal ordered by ascending key value, not in the order you asked for them. Since \pythoninline{gtsam.symbol_shorthand.L} encodes the character \texttt{'l'} (108) and \pythoninline{X} encodes \texttt{'x'} (120), every landmark key sorts before every pose key: a query for \(\left[X(k), L(3), L(7)\right]\) comes back ordered \(\left[L(3), L(7), X(k)\right]\). Stack a measurement Jacobian against that without noticing and the result is an innovation covariance that is subtly, silently wrong.
+
+    \begin{solution} \input{py/gtsam/e/solu.tex} \end{solution}
+
+    % ------------------------------------------------------------------ (f)
+    \breakans
+    \part Implement \input{py/gtsam/f/def.tex}, which assembles
+    \[
+        S = H P H^T + R
+    \]
+    for the whole local map at once. This is (9.26) with \(P = (R^TR)^{-1}\) recovered in part (e), \(H\) the stacked Jacobian \(\mathbf{J}_a\) from part (d), and \(R\) the block-diagonal measurement noise \(\mathbf{R}_a\).
+
+    \(H\) is dense in its three leftmost columns, because every measurement depends on the pose, and block diagonal elsewhere, because measurement \(i\) depends only on landmark \(i\) -- the same structure as the EKF-SLAM measurement Jacobian, for the same reason.
+
+    Note that \(P\) contains the cross-covariances \emph{between landmarks}. Those cross terms are the entire reason JCBB can be joint rather than a sequence of independent gates: they are what makes a set of individually plausible associations collectively implausible.
+
+    \begin{solution} \input{py/gtsam/f/solu.tex} \end{solution}
+
+    % ------------------------------------------------------------------ (g)
+    \breakans
+    \part Landmark birth. A measurement that JCBB could not associate is either a landmark you have not seen before, or clutter. Putting every one of them straight into the graph fills the map with spurious landmarks that then attract wrong associations; never putting them in means the map never grows.
+    \begin{subparts}
+        \subpart Implement \input{py/gtsam/g1/def.tex}, the inverse measurement function \(\mathbf{h}^{-1}(z, x)\).
+
+        Compare this with \pythoninline{add_landmarks} in the EKF-SLAM assignment, where you also had to propagate \(G_x^j P G_x^{jT} + G_z^j R G_z^{jT}\) by hand. Here you do not: once the landmark is connected by factors, the graph works its covariance out for itself. That is a direct consequence of (9.2) -- the posterior was always a product of factors, and the EKF's covariance bookkeeping was only ever a way of summarising it.
+        \begin{solution} \input{py/gtsam/g1/solu.tex} \end{solution}
+
+        \subpart Implement \input{py/gtsam/g2/def.tex}, the \(M\) of \(N\) confirmation rule: promote a tentative landmark once it has been seen in at least \(M\) distinct time steps inside a sliding window of the last \(N\), inclusive at both ends. This is the same track initiation logic used in target tracking.
+        \begin{solution} \input{py/gtsam/g2/solu.tex} \end{solution}
+    \end{subparts}
+
+\end{parts}

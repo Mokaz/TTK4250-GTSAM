@@ -1,0 +1,28 @@
+\begin{pythoncode}
+def f(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
+    """Add the odometry u to the robot state x.
+
+    Parameters
+    ----------
+    x : np.ndarray, shape=(3,)
+    the robot state
+    u : np.ndarray, shape=(3,)
+    the odometry
+
+    Returns
+    -------
+    np.ndarray, shape = (3,)
+    the predicted state
+    """
+    xpred = np.hstack(
+        [x[0:2] + rotmat2d(x[2]) @ u[0:2], utils.wrapToPi(x[2] + u[2])]
+    )
+    # test:
+    assert np.allclose(
+        xpred,
+        np.block([x[0:2] + rotmat2d(x[2]) @ u[0:2],
+                 utils.wrapToPi(x[2] + u[2])]),
+    )
+    assert xpred.shape == (3,), "EKFSLAM.f: wrong shape for xpred"
+    return xpred
+\end{pythoncode}

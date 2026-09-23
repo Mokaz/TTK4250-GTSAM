@@ -1,0 +1,13 @@
+\IfFileExists{minted2.sty}{\usepackage{minted}}{\usepackage[outputdir=build]{minted}} % \setminted{autogobble}\usemintedstyle{friendly}
+
+\definecolor{code_background}{rgb}{0.9,0.9,0.94}
+% \definecolor{code_background}{HTML}{282c34}
+
+\usemintedstyle{friendly}
+
+\newminted{python}{autogobble, bgcolor=code_background}
+% \newmint{python}{autogobble, bgcolor=red}
+\newmintinline{python}{bgcolor=code_background}
+
+
+\newcommand{\pysolution}[1]{\pythonfile{code/assignment2/#1.py}}

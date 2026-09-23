@@ -1,0 +1,7 @@
+\begin{pythoncode}
+def inverse_measurement(pose: gtsam.Pose2, measurement: np.ndarray) -> np.ndarray:
+    measured_range, measured_bearing = float(measurement[0]), float(measurement[1])
+    landmark_body = gtsam.Rot2(measured_bearing).rotate(gtsam.Point2(measured_range, 0.0))
+    landmark_world = pose.transformFrom(landmark_body)
+    return np.asarray(landmark_world, dtype=float).reshape(2)
+\end{pythoncode}

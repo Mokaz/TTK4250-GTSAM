@@ -1,0 +1,39 @@
+\titledquestion{Run factor graph SLAM on simulated data}
+\label{q:task02}
+You are given a data set consisting of
+\begin{itemize}
+    \item odometry (K, 3): the measured movement of the robot in body frame
+    \item z (K,): Python list of detections at each time step. Each detection is (\#measurements, 2).
+    \item poseGT (K, 3): the pose ground truth at each time step
+    \item landmarks (M, 2): the ground truth landmarks
+\end{itemize}
+
+We have given you a set of pretty good initial tuning values (marked with \pythoninline{# TODO tune} in \pythoninline{configs/sim_default.yaml}). We want you to find 3 different sets of tuning values that differ in different ways and explain the results you get using them.
+
+An example of three different sets of tuning values could be
+\begin{itemize}
+    \item a set that gives better performance than the initial tuning values in some way
+    \item a set that gives similar performance in terms of error but bad performance in terms of consistency
+    \item a set that yields very few landmarks, but still manages to keep track to some degree
+\end{itemize}
+
+\hfill
+
+In addition to the plots listed on the first page, we want one figure that has no counterpart in the EKF-SLAM assignment: for a pose \(x_k\) somewhere in the middle of the run, compare its error \emph{as estimated at time \(k\)} with its error \emph{in the final estimate}.
+A filter cannot revise the past; a smoother can, and does. Explain what you see, and relate it to (9.2) and to what the odometry factors are doing to the earlier poses when a landmark is re-observed.
+
+\hfill
+
+Some questions to help discussion (not mandatory to answer):
+\begin{itemize}
+    \item Which types of errors do you see?
+    \item Why do you think the errors are like this?
+    \item Setting \pythoninline{association: method: gt} runs with perfect data association. How much of your error is the front-end responsible for, and how much is the back-end? (Sec.\ 9.1)
+    \item Would you say that there are any shortcomings of the algorithm on this data set?
+\end{itemize}
+
+\textit{Note}: The runtime can be quite sensitive to the alphas of JCBB.
+This is due both to the depth of search and creation of new landmarks, creating sort of a tradeoff.
+This is especially true when other poor parameters are chosen, so that too few or too many landmarks fit the prediction.
+This is usually seen quite quickly by the associations, and how many new landmarks are created.
+It is also sensitive to \pythoninline{sensor.range_local} and \pythoninline{sensor.bearing_local_deg}, which decide how many variables the joint covariance in Task \ref{q:task01} (e) is recovered over.

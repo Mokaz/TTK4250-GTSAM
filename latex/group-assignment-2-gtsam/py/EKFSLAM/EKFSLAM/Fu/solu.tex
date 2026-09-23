@@ -1,0 +1,21 @@
+\begin{pythoncode}
+def Fu(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
+    """Calculate the Jacobian of f with respect to u.
+
+    Parameters
+    ----------
+    x : np.ndarray, shape=(3,)
+    the robot state
+    u : np.ndarray, shape=(3,)
+    the odometry
+
+    Returns
+    -------
+    np.ndarray
+    The Jacobian of f wrt. u.
+    """
+    Fu = np.eye(3)
+    Fu[:2, :2] = rotmat2d(x[2])
+    assert Fu.shape == (3, 3), "EKFSLAM.Fu: wrong shape"
+    return Fu
+\end{pythoncode}

@@ -1,0 +1,57 @@
+\begin{pythoncode}
+def update(
+    self, eta: np.ndarray, P: np.ndarray, z: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray]:
+    numLmk = (eta.size - 3) // 2
+    if numLmk > 0:
+        # Prediction and innovation covariance
+        zpred = self.h(eta)
+        H = self.h_jac(eta)
+        S = H @ P @ H.T
+        # adding to block diag is much faster instead of using kron
+        # (numLmk, 2): [[0, 1], [2, 3], ...]
+        idxs = np.arange(numLmk * 2).reshape(numLmk, 2)
+        # block diag indices for 2 x 2 blocks, broadcast R
+        S[idxs[..., None], idxs[:, None]] += self.R[None]
+        z = z.ravel()  # 2D -> flat
+        # Perform data association if it is asked for
+        za, zpred, Ha, Sa, a = self.associate(z, zpred, H, S)
+        # No association could be made, so
+        if za.shape[0] == 0:
+            etaupd = eta
+            Pupd = P
+            NIS = 1  # TODO: beware this one when analysing consistency.
+        else:
+            # Create the associated innovation
+            v = za.ravel() - zpred  # za: 2D -> flat
+            v[1::2] = utils.wrapToPi(v[1::2])
+            # Kalman mean update
+            S_cho_factors = la.cho_factor(Sa)
+            W = la.cho_solve(S_cho_factors, Ha @ P).T
+            # W = np.linalg.solve(S, H@P).T
+            # NIS = v@(np.linalg.solve(S, v))
+            etaupd = eta + W @ v
+            # Kalman cov update: use Joseph form for stability
+            # Jo = np.eye(*P.shape) - W @ H
+            jo = -W @ Ha
+            # same as adding Identity mat
+            jo[np.diag_indices(jo.shape[0])] += 1
+            Pupd = jo @ P @ jo.T + \
+                    W @ (np.kron(np.eye(za.size // 2), self.R)) @ W.T
+            NIS = v @ la.cho_solve(S_cho_factors, v)
+    else:  # All measurements are new landmarks,
+        a = np.full(z.shape[0], -1)
+        z = z.flatten()
+        NIS = 1  # TODO: beware this one when analysing consistency.
+        etaupd = eta
+        Pupd = P
+    # Create new landmarks if any is available
+    if self.do_asso:
+        is_new_lmk = a == -1
+        if np.any(is_new_lmk):
+            z_new_inds = np.empty_like(z, dtype=bool)
+            z_new_inds[::2] = is_new_lmk
+            z_new_inds[1::2] = is_new_lmk
+            etaupd, Pupd = self.add_landmarks(etaupd, Pupd, z[z_new_inds])
+    return etaupd, Pupd, NIS, a
+\end{pythoncode}

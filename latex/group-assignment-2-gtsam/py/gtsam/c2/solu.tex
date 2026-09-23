@@ -1,0 +1,18 @@
+\begin{pythoncode}
+def add_odometry_factor(
+    graph: gtsam.NonlinearFactorGraph,
+    key_previous: int,
+    key_current: int,
+    relative_pose: gtsam.Pose2,
+    relative_pose_cov: np.ndarray,
+) -> None:
+    noise = gtsam.noiseModel.Gaussian.Covariance(relative_pose_cov)
+    graph.add(
+        gtsam.BetweenFactorPose2(
+            key_previous,
+            key_current,
+            relative_pose,
+            noise,
+        )
+    )
+\end{pythoncode}

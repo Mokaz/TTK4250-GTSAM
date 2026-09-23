@@ -1,0 +1,21 @@
+\begin{pythoncode}
+def predict_measurement(
+    pose: gtsam.Pose2,
+    landmark: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    landmark = gtsam.Point2(float(landmark[0]), float(landmark[1]))
+
+    H_range_pose = np.zeros((1, 3), order="F")
+    H_range_landmark = np.zeros((1, 2), order="F")
+    H_bearing_pose = np.zeros((1, 3), order="F")
+    H_bearing_landmark = np.zeros((1, 2), order="F")
+
+    predicted_range = pose.range(landmark, H_range_pose, H_range_landmark)
+    predicted_bearing = pose.bearing(landmark, H_bearing_pose, H_bearing_landmark).theta()
+
+    z = np.array([predicted_range, predicted_bearing])
+    H_pose = np.vstack((H_range_pose, H_bearing_pose))
+    H_landmark = np.vstack((H_range_landmark, H_bearing_landmark))
+
+    return z, H_pose, H_landmark
+\end{pythoncode}

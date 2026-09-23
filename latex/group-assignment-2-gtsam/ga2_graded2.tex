@@ -1,0 +1,110 @@
+\documentclass{exam}
+\input{../env/packages}
+\input{../env/mycommands}
+\input{../env/pystuff}
+\input{../env/newcommands}
+
+\printanswers
+\assignmentnr{2}
+\deadline{Tuesday {3}. November 23:59}
+
+\begin{document}
+{\bf Hand in:} \emph{Tuesday {3}. November 23:59} on Canvas.
+
+\textbf{Groups size:} This assignment can be solved in groups of two or three. You are allowed to complete the assignment on your own if you want, but we advice you to solve it in groups as we believe that group discussions are important. Via Canvas you should also be able to see if there are groups with open spots that you could contact. It is okay to discuss the assignment with other groups, but each group should write an individual report.
+
+\textbf{Group signup:} You find the group signup under \texttt{People} $\rightarrow$ \texttt{Groups} $\rightarrow$ \texttt{GA2 group} in the menu on the left on Canvas. You and your group should sign up in the same group.
+
+\textbf{Hand in:} Hand in the code as \textbf{the zip created by running \textit{create\_handin.py}}. Do not use any libraries that are not part of the TTK4250 environment.
+Hand in the report as a single pdf.
+Only one student per group should hand in both the report and the code.
+
+\section*{Code content:}
+The score on the code will be based on the number of tests passed, just as for the individual assignments.
+If you notice the tests having false negatives or positives, or behaving weirdly, please let us know.
+
+\section*{Report content:}
+For the report you are limited to 1000 words and a total of 6 pages (1 frontpage, 6 pages of content, 1 page of bibliography). Figure captions do not count toward the limit, as long as they are concise and purely descriptive. The group number and group members should be clearly stated.
+
+In the report we simply require you to clearly answer Task \ref{q:task02}, \ref{q:task03} and \ref{q:task04}. As the report is short you can skip the introduction and conclusion.
+You can assume the person reading the report has good knowledge of the subject.
+You can simply refer to equations and algorithms in the book when what you want to say is already stated there.
+Ex: "Given what's stated in (12.34) and equation (56.78) in the book the oscillations in Figure 9 are expected" (When refering to equations, figures etc. you should make it clear if you are refering to equations, figures etc. in the book or report).
+
+The goal of the report is to show that you understand the code and the theory behind it by presenting and discussing the plots and results. Remember to argue your points and explain your reasoning. Points are not given if what you state is right but you don't explain why.
+Ex: If you write "These parameters gave bad results", you should also include something like "as can be seen by the high RMSE values in Figure 9".
+
+It is not expected that you present all the results, plots, and tuning variables from the code, but rather that you present and discuss the ones you find most relevant for each part of the assignment. The report should, however, include all four main types of plots (state, NIS, NEES, error).
+
+If you have any questions please make a post on the forum and we will try to answer them as soon as possible or contact the student assistants during the excise class.
+
+In task 2 and 3 you will be asked to try out different sets of tuning values. The following list should not be completed for every set of tuning values, but in total we want to see the following from running on the simulated data
+\begin{itemize}
+	\item plot of trajectory and map.
+	\item position estimate error over time
+	\item the error of a pose as estimated at the time it was added, against its error in the final smoothed estimate,
+	\item plot of the NIS along with your chosen confidence bounds over time,
+	\item plot of pose NEES along with your chosen confidence bounds over time,
+	\item the averaged NIS along with your confidence bound, where the average can for instance be over number of associated landmarks in total,
+	\item the averaged NEES along with your confidence bounds,
+	\item the number of times NIS falls within your confidence bounds
+	\item the number of times the NEES fall within your confidence regions
+	\item and the RMSE (mean taken over time)
+	\item (Optional) NEES of the map.
+\end{itemize}
+
+From running on real data this list reduces to
+\begin{itemize}
+	\item plot of trajectory and map.
+	\item position vs GPS distance over time.
+	\item plot of the NIS along with your chosen confidence bound over time,
+	\item the averaged NIS along with the confidence bound,
+	\item the number of times NIS falls within your confidence bounds
+	\item per-step runtime split into association, covariance recovery and optimization, against the number of landmarks,
+	\item (Optional) show GPS in a NIS or NEES
+\end{itemize}
+
+We expect you to discuss what these plots and numbers mean in practice, and how they are connected to the different tuning parameters.
+
+Answers and analysis should connect theory and results to the real world, and show your understanding of the problem and the solution. Theoretical or practical insight from the lectures or book elaborated upon or applied to the data sets counts positive.
+
+Points can also be given for other plots, numbers, and considerations, but what to show is \emph{up to you} to decide.
+We also invite you to be critical about the assumptions made and the implementation of the system.
+Try to connect the results on the simulated data to the results of the real data where it is possible.
+Where a comparison with the EKF-SLAM you implemented earlier in the course is informative, make it.
+
+We know the task description can be a bit vague, but we don't want you to end up writing different copies of the same report. Rest assured that two very different reports can both receive a top grade.
+
+If you have any questions please make a post on the forum and we will try to answer them as soon as possible.
+
+\noindent\makebox[\linewidth]{\rule{\textwidth}{0.4pt}}
+
+\section*{Some background on the template code}
+The template code is a trimmed-down version of a factor graph SLAM system built on \href{https://gtsam.org}{GTSAM}, the library referred to in Sec.\ 9.5 of the book. GTSAM provides the back-end: it holds the factor graph, maintains the Bayes tree, and solves for the MAP estimate incrementally with iSAM2. Everything that GTSAM does \emph{not} do -- building the right factors, recovering a covariance from the graph, and data association -- is either yours to implement or given in the front-end.
+
+Install with \pythoninline{uv sync}, and run the tests with \pythoninline{uv run pytest}. Runs are started with \pythoninline{uv run run_sim} and \pythoninline{uv run run_real}, and an existing run can be re-plotted with \pythoninline{uv run plot_run <run directory>}.
+
+The files handed out are:
+\begin{itemize}
+	\item \pythoninline{configs/}: the run configurations. Everything marked \pythoninline{# TODO tune} is yours to experiment with in Task \ref{q:task02} and \ref{q:task03}.
+	\item \pythoninline{preprocessing.py}: the odometry and lidar front-end. \pythoninline{relative_pose} and \pythoninline{preintegrate} are yours; \pythoninline{detect_trees}, which converts a raw lidar scan into range-bearing measurements, is given. \textbf{NB:} you do not need to change anything below the line in this file.
+	\item \pythoninline{factor_graph.py}: factor construction, the measurement model, covariance recovery and the innovation covariance. Most of your work is here.
+	\item \pythoninline{landmark_manager.py}: landmark birth. The \(M\) of \(N\) rule is yours; the rest is given.
+	\item \pythoninline{data_association.py}: the JCBB algorithm, and a ground-truth associator you can switch on for debugging on the simulated data set. \textbf{NB:} you do not need to do anything in this file.
+	\item \pythoninline{slam.py}: the main loop that ties all of the above together. Reading it is the fastest way to understand what happens in one time step. \textbf{NB:} you do not need to do anything in this file.
+	\item \pythoninline{loaders/}, \pythoninline{logger.py}, \pythoninline{plotter.py}, \pythoninline{plotting/}: data set adapters, run logging, and all the plotting. \textbf{NB:} you do not need to do anything in these files.
+\end{itemize}
+
+Two conventions in this code base are easy to get backwards, and both produce a system that runs and looks plausible while being wrong: measurements are ordered \([\text{range}, \text{bearing}]\) while GTSAM's \pythoninline{BearingRangeFactor2D} takes bearing first, and all pose covariances and Jacobians live in the tangent space of the current estimate rather than in raw \((x, y, \psi)\) coordinates. Both are discussed where they matter in Task \ref{q:task01}.
+
+\rule{\textwidth}{0.4pt}
+
+\begin{questions}
+	\breaknoans \breakans
+	\input{ga2_task01_implement.tex}
+	\input{ga2_task02_run_sim.tex}
+	\breaknoans
+	\input{ga2_task03_run_real.tex}
+	\input{ga2_task04_experiments.tex}
+\end{questions}
+\end{document}

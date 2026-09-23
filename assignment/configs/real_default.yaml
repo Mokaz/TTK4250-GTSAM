@@ -1,0 +1,40 @@
+# Baseline tuning for the Victoria Park data set.
+# Everything marked "TODO tune" is yours to experiment with in Task 3.
+noise:
+  sigma_velocity: 0.1            # TODO tune
+  sigma_steer_deg: 0.5           # TODO tune
+  sigma_odom_x: 0.3              # TODO tune
+  sigma_odom_y: 0.3              # TODO tune
+  sigma_odom_yaw_deg: 0.6        # TODO tune
+  sigma_range: 0.2               # TODO tune
+  sigma_bearing_deg: 0.5         # TODO tune
+  sigma_init_pose_x: 0.1
+  sigma_init_pose_y: 0.1
+  sigma_init_pose_yaw_deg: 0.1
+sensor:
+  range_local: 50.0              # TODO tune
+  bearing_local_deg: 100.0       # TODO tune
+tentative:
+  M: 3                           # TODO tune: lidar tree detections are noisy
+  N: 4                           # TODO tune
+  gate: 0.2                      # TODO tune
+association:
+  method: jcbb                   # no ground truth here, so "gt" is not available
+  alpha_individual: 0.9999       # TODO tune
+  alpha_joint: 0.9999            # TODO tune
+  gt_gate: 2.0
+backend:
+  solver: isam2                  # do not use "batch" on this data set
+  relinearize_threshold: 0.1     # TODO tune (Task 4)
+  relinearize_skip: 10           # TODO tune (Task 4)
+  covariance_method: auto
+  robust_kernel: none            # "huber" (Task 4)
+  huber_k: 1.345
+logging:
+  log_association_diagnostics: false
+  association_stride: 200
+  association_steps: []
+  log_snapshot: false
+  snapshot_stride: 200
+  snapshot_steps: []
+  log_error: false
