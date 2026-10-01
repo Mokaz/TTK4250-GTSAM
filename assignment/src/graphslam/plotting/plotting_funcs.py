@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib.patches import Ellipse
 from scipy.stats import chi2, spearmanr
 
-from graphslam.data_association import NIS, individualCompatibility
+from graphslam.data_association import NIS
 from graphslam.plotting.thesis_style import thesis_figsize
 from graphslam.utils import rotmat2, ssa
 
@@ -209,6 +209,21 @@ def plot_per_step_timing(
     return fig, ax
 
 
+def _has_clique_counts(n_support: np.ndarray | None) -> bool:
+    """Whether the support-clique counter actually produced anything.
+
+    ``ISAM2::jointMarginalSupportCliqueCount`` is not part of GTSAM 4.3, so on a
+    stock install ``num_support_cliques`` is logged as a constant zero. Plotting
+    it then gives a flat line and a Spearman rho over a constant input, which is
+    noise rather than a diagnostic. The panels using it are dropped unless a
+    patched build has filled them in.
+    """
+    if n_support is None:
+        return False
+    n_support = np.asarray(n_support, dtype=float)
+    return n_support.size > 0 and np.any(np.isfinite(n_support) & (n_support > 0))
+
+
 def plot_landmarks_and_timing(
     steps: np.ndarray,
     t_cov: np.ndarray,
@@ -218,7 +233,12 @@ def plot_landmarks_and_timing(
 ) -> tuple[plt.Figure, plt.Axes]:
     """Plot covariance recovery step time and in-view predicted landmark count."""
 
-    fig, axes = _ensure_ax(axes, figsize=(6, 6), nrows=3, ncols=1, sharex=True)
+    show_support = _has_clique_counts(n_support)
+    nrows = 3 if show_support else 2
+
+    fig, axes = _ensure_ax(
+        axes, figsize=(6, 2 * nrows), nrows=nrows, ncols=1, sharex=True
+    )
 
     axes[0].plot(steps, t_cov*1000, lw=0.8, color="tab:blue", label="Covariance recovery time")
     axes[0].set_ylabel("Time (ms)")
@@ -231,12 +251,17 @@ def plot_landmarks_and_timing(
     axes[1].set_ylabel("# In-view landmarks")
     axes[1].grid(True, lw=0.4)
     axes[1].legend()
+    axes[1].set_xlabel("Scan step")
 
-    axes[2].plot(steps, n_support, lw=0.8, color="tab:green", label="# Support cliques")
-    axes[2].set_ylabel("# Support cliques")
-    axes[2].set_xlabel("Scan step")
-    axes[2].grid(True, lw=0.4)
-    axes[2].legend()
+    if show_support:
+        axes[1].tick_params(axis="x", which="both", labelbottom=False)
+        axes[1].set_xlabel("")
+
+        axes[2].plot(steps, n_support, lw=0.8, color="tab:green", label="# Support cliques")
+        axes[2].set_ylabel("# Support cliques")
+        axes[2].set_xlabel("Scan step")
+        axes[2].grid(True, lw=0.4)
+        axes[2].legend()
 
     return fig, axes
 
@@ -248,12 +273,14 @@ def plot_timing_vs_landmarks(
     ax: plt.Axes | None = None,
 ) -> tuple[plt.Figure, plt.Axes]:
     """Plot covariance recovery step time against in-view landmark count."""
-    fig, axes = _ensure_ax(ax, figsize=(8, 4), nrows=1, ncols=2)
+    show_support = _has_clique_counts(n_support)
+    ncols = 2 if show_support else 1
+
+    fig, axes = _ensure_ax(ax, figsize=(4 * ncols, 4), nrows=1, ncols=ncols)
+    axes = np.atleast_1d(axes)
 
     t_cov_ms = 1000.0 * t_cov
-    t_support_ms = 1000.0 * t_cov
 
-    rho_support, _ = spearmanr(n_support, t_support_ms)
     rho_local, _ = spearmanr(n_local, t_cov_ms)
 
     def plot_panel(axis, x, y, xlabel, rho):
@@ -302,7 +329,10 @@ def plot_timing_vs_landmarks(
         axis.legend(fontsize=8)
 
     plot_panel(axes[0], n_local, t_cov_ms, "# In-view landmarks", rho_local)
-    plot_panel(axes[1], n_support, t_support_ms, "# Support cliques", rho_support)
+
+    if show_support:
+        rho_support, _ = spearmanr(n_support, t_cov_ms)
+        plot_panel(axes[1], n_support, t_cov_ms, "# Support cliques", rho_support)
 
     return fig, axes
 

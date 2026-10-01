@@ -28,7 +28,7 @@ backend:
   solver: isam2
   relinearize_threshold: 0.1
   relinearize_skip: 10
-  covariance_method: auto
+  covariance_method: bayes_tree
   robust_kernel: none
   huber_k: 1.345
 logging:

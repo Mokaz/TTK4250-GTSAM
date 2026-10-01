@@ -9,26 +9,42 @@ truth, and the Victoria Park lidar data set.
 
 ## Setup
 
-Python 3.11 or newer.
+Install [Miniconda](https://www.anaconda.com/download) — the minimal installer,
+**not** the full Anaconda Distribution, and not "whatever conda you already
+have". Then, from this directory:
 
 ```sh
-uv sync            # or: pip install -e ".[dev]"
+conda info                      # check: conda version 25 or newer
+conda env create -f environment.yml
+conda activate ttk4250_ga2
+pip install -e . --no-deps
 ```
 
-GTSAM ships as a binary wheel for most platforms. If none is available for
-yours, see `docs/INSTALL.md`.
+**That first line is not optional.** A conda older than 25 cannot solve this
+environment, and the error it gives you is unrecognisable. If `conda version` is
+older, or if `base environment` points at an Anaconda install you did not expect,
+stop and read `docs/INSTALL.md`.
+
+`pip install -e . --no-deps` puts `run_sim`, `run_real` and `plot_run` on your
+path. Re-run it only if entry points change; editing source needs nothing.
+
+Do not use `pip install gtsam` or `uv sync`: PyPI has no Windows wheel for
+GTSAM.
 
 ## Running
 
 From the root of this directory:
 
 ```sh
-uv run run_sim                      # simulated data
-uv run run_real                     # Victoria Park
+run_sim                      # simulated data
+run_real                     # Victoria Park
 
-uv run run_sim --config configs/sim_default.yaml --steps 1000 --output-dir runs/sim/example
-uv run plot_run runs/sim/example    # re-plot a finished run
+run_sim --config configs/sim_default.yaml --steps 1000 --output-dir runs/sim/example
+plot_run runs/sim/example    # re-plot a finished run
 ```
+
+With the environment active. Add `--no-show-plots` to skip the interactive
+windows; figures are written to the run directory either way.
 
 Every run writes its resolved configuration, per-step diagnostics and state
 snapshots into its output directory, so a run can be re-plotted and compared
@@ -52,8 +68,8 @@ Ten functions, all marked `TODO` in the source and graded by `pytest`:
 | g2 | `TentativeLandmark.is_confirmed` | `src/graphslam/landmark_manager.py` |
 
 ```sh
-uv run pytest            # everything
-uv run pytest -k jacobian -x
+pytest                   # everything
+pytest -k jacobian -x
 ```
 
 Nothing else needs changing. `slam.py`, `data_association.py`, the loaders, the
@@ -62,6 +78,7 @@ logger and the plotting are given.
 ## Layout
 
 ```text
+environment.yml   the conda environment; this is the supported setup
 configs/          run configurations; everything marked "TODO tune" is yours
 data/             simulated and Victoria Park data sets
 src/graphslam/

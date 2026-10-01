@@ -1,0 +1,33 @@
+# Environment for TTK4250 Group Assignment 2.
+#
+#   conda env create -f environment.yml
+#   conda activate ttk4250
+#   pip install -e . --no-deps
+#
+# Everything comes from conda-forge, which publishes GTSAM 4.3 for Windows,
+# Linux and macOS. PyPI does not ship a Windows wheel for GTSAM, which is why
+# this file and not `pip install` or `uv sync` is the supported setup.
+#
+# "nodefaults" matters if you have full Anaconda installed: without it the
+# `defaults` channel can win the solve and pull incompatible builds.
+name: ttk4250_ga2
+
+channels:
+  - conda-forge
+  - nodefaults
+
+dependencies:
+  - python=3.11
+
+  # 4.3 is the first release exposing ISAM2.jointMarginalCovariance, which is
+  # what graphslam.factor_graph.query_joint_covariance calls. Do not relax.
+  - gtsam>=4.3,<5
+
+  - numpy>=1.26
+  - scipy>=1.11
+  - matplotlib>=3.8
+  - omegaconf>=2.3
+  - tqdm>=4.66
+
+  - pytest>=8.0
+  - pip

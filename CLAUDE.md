@@ -1,0 +1,138 @@
+# TTK4250 Group Assignment 2 — factor graph SLAM
+
+Replacing the old EKF-SLAM Group Assignment 2 with a factor-graph SLAM assignment
+built on a GTSAM/iSAM2 master's-thesis code base. Martin is the course staff
+member building it; students are 4th/5th-year NTNU cybernetics.
+
+## Layout
+
+```text
+src/master_code/      original thesis code, essentially untouched
+assignment/           the teaching fork, package `graphslam` — THE REFERENCE SOLUTION
+handout/              generated student skeleton (never edit by hand)
+latex/group-assignment-2-gtsam/
+                      ga2_*.tex is the new assignment text; graded2.tex and
+                      task0*.tex are the ORIGINAL EKF-SLAM files — do not touch
+latex/env/            LaTeX preamble
+```
+
+`assignment/` is the source of truth. `handout/` is regenerated from it with
+`python tools/make_handout.py --out ../handout`; the LaTeX code snippets come
+from the same pass with `--latex`.
+
+`handout/` is gitignored on purpose: it is fully generated, it is ~12 MB
+because the generator copies `data/` into it, and a committed copy can drift
+from `assignment/`. Zip it at release time instead of tracking it.
+
+## Environment
+
+conda, not uv — GTSAM 4.3 has no Windows wheel on PyPI. Environment name
+`ttk4250_ga2`, built from `assignment/environment.yml`, with the package
+registered via `pip install -e . --no-deps`.
+
+Shell activation does not reliably survive into an agent's shell on Windows.
+Prefer running things explicitly in the environment:
+
+```sh
+conda run --no-capture-output -n ttk4250_ga2 pytest
+conda run --no-capture-output -n ttk4250_ga2 run_real --steps 2000 --no-show-plots
+```
+
+If you do activate first (`conda activate ttk4250_ga2`), plain `pytest`,
+`run_sim`, `run_real` and `plot_run` all work.
+
+`docs/INSTALL.md` carries the student-facing setup, including three Windows
+traps that cost real time (old Anaconda conda cannot solve the env; Anaconda's
+`conda init cmd.exe` AutoRun hook hijacks a fresh Miniconda prompt; a fresh
+Miniconda stops on `CondaToSNonInteractiveError`).
+
+## The editable-install trap — read this before debugging anything
+
+`assignment/` and `handout/` both install as the package `graphslam`, and
+`pip install -e .` registers the **environment**, not the directory you are
+standing in. After `cd handout && pip install -e . --no-deps`, every later
+`pytest` / `run_sim` / `run_real` runs the handout's code from any directory,
+including `assignment/`. The symptom is a traceback whose paths say
+`handout\src\graphslam` and a `NotImplementedError` from a task that is
+implemented.
+
+Always check first:
+
+```sh
+python -c "import graphslam, pathlib; print(pathlib.Path(graphslam.__file__).parent)"
+```
+
+## The ten graded functions
+
+Each is wrapped in `# TODO(<task>):` + `# BEGIN SOLUTION` / `# END SOLUTION`.
+`make_handout.py` parses exactly those markers, so do not reformat them.
+
+| | Function | File | Book anchor |
+|---|---|---|---|
+| a | `relative_pose` | `preprocessing.py` | (9.5), Sec. 6.2.3 |
+| b | `preintegrate` | `preprocessing.py` | Sec. 9.1 |
+| c1 | `predict_pose` | `factor_graph.py` | (9.5), (9.13) |
+| c2 | `add_odometry_factor` | `factor_graph.py` | (9.4), (9.6) |
+| c3 | `add_landmark_factor` | `factor_graph.py` | (9.6) |
+| d | `predict_measurement` | `factor_graph.py` | (9.7), (9.8) |
+| e | `reorder_joint_covariance` | `factor_graph.py` | Sec. 9.4.1, (9.27)–(9.28) |
+| f | `innovation_covariance` | `factor_graph.py` | **(9.26)** |
+| g1 | `inverse_measurement` | `factor_graph.py` | (9.2) |
+| g2 | `TentativeLandmark.is_confirmed` | `landmark_manager.py` | track initiation |
+
+Book references are to `sf2026c.pdf` (the 2026 edition with Lie theory).
+
+## Two conventions that silently produce a plausible wrong system
+
+**Ordering.** Measurements are `[range, bearing]` everywhere in this code base.
+GTSAM's `BearingRangeFactor2D` wants bearing first.
+
+**Frames.** The covariance GTSAM reports for a `Pose2`, and the Jacobians from
+`Pose2.range` / `Pose2.bearing`, live in the tangent space at the current
+estimate. Used together they are consistent; mixing either with a hand-derived
+`d/d[x, y, theta]` is not. Same applies to NEES — see
+`graphslam.utils.pose2_tangent_error`.
+
+## Testing
+
+75 tests, ~5 s. The suite is also the grading instrument, so a test's failure
+message is student-facing: write them that way.
+
+Run the handout through the suite after any change to the solution blocks — the
+expected result is that only the tests touching given code pass. That number is
+the scoring floor and is currently 23 of 75.
+
+`tests/test_plotting.py` exists because every other test runs with
+`save_plots=False`; without it a rename in the plotting stack escapes the suite
+and only explodes after a finished multi-minute run. Keep that covered.
+
+## Measured
+
+Victoria Park, 2000 steps: ~22 s, ~91 it/s, 193 landmarks. Split roughly
+covariance 7.3 s / association 4.8 s / optimization 5.9 s. Per-step median
+9.4 ms, 95th percentile 20.8 ms.
+
+## Known gaps and open decisions
+
+- **`real_default.yaml` is over-conservative.** Landmark ANIS ≈ 0.24 against a
+  95% interval of [0.93, 1.07] — S is roughly 2x too wide. Task 3 text claims
+  "pretty good initial tuning values". Either retune or make the inconsistency
+  deliberate and say so in the text. Not yet decided.
+- **Scoring floor.** An empty submission passes 23/75, so "score = fraction of
+  tests passed" gives 31% for nothing.
+- **Task (c3) has one independent test.** Its other two tests fail on (d) first.
+- `jointMarginalSupportCliqueCount` is not in GTSAM 4.3, so
+  `num_support_cliques` is always zero. The plots that used it are skipped
+  unless a patched build fills it in.
+- Full 7300-step Victoria Park run not yet timed; the `--steps` figure in the
+  assignment text is provisional.
+- `Car.a` / `Car.b` (lidar offset) parsed but unused.
+- `plot_position_nis` hardcodes a 1 m GNSS sigma.
+- Reference solution not yet solved once from the student side and timed.
+
+## Working style for this repo
+
+Do not change code when asked only to review it. Do not touch the original
+EKF-SLAM LaTeX files. When a design decision affects the students' experience
+(scoring, what a task tests, what the shipped tuning demonstrates), surface it
+rather than picking silently.

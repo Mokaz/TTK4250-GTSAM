@@ -27,12 +27,15 @@ backend:
   solver: isam2                  # do not use "batch" on this data set
   relinearize_threshold: 0.1     # TODO tune (Task 4)
   relinearize_skip: 10           # TODO tune (Task 4)
-  covariance_method: auto
+  covariance_method: bayes_tree      # "marginals" or "elimination" to compare
   robust_kernel: none            # "huber" (Task 4)
   huber_k: 1.345
 logging:
-  log_association_diagnostics: false
-  association_stride: 200
+  # On: this is what feeds the landmark-NIS plot, which is the only consistency
+  # check Victoria Park gives you (there is no ground truth, so no NEES). Every
+  # 20th scan keeps the run directory to a couple of megabytes.
+  log_association_diagnostics: true
+  association_stride: 20
   association_steps: []
   log_snapshot: false
   snapshot_stride: 200

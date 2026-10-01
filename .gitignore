@@ -1,6 +1,8 @@
 # OS metadata
 .DS_Store
 Thumbs.db
+ehthumbs.db
+desktop.ini
 
 # Python bytecode and native extensions
 __pycache__/
@@ -9,8 +11,8 @@ __pycache__/
 *.so
 
 # Virtual environments and local secrets
-/.venv/
-/venv/
+.venv/
+venv/
 /env/
 .env
 .env.*
@@ -41,11 +43,43 @@ htmlcov/
 .idea/
 .claude/settings.local.json
 
-# Generated SLAM outputs
-/runs/*
-!/runs/.gitkeep
-/videos/*
-!/videos/.gitkeep
+# Generated SLAM outputs.
+# Unanchored so this also catches assignment/runs/ and src/master_code/runs/,
+# not just the one at the repo root.
+**/runs/*
+!**/runs/.gitkeep
+**/videos/*
+!**/videos/.gitkeep
+
+# The student handout is generated, never written by hand:
+#     cd assignment && python tools/make_handout.py --out ../handout
+# It is ~12 MB because make_handout copies data/ into it, and a committed copy
+# can silently drift from assignment/, which is the one thing the generator
+# exists to prevent. Build a zip at release time instead of tracking it.
+/handout/
+
+# The zip students upload, if create_handin.py is run inside the repo
+handin_*.zip
+
+# LaTeX build output. latexmk is pointed at build/, but keep the extensions
+# too, for anyone compiling in place or from an editor.
+latex/**/build/
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.nav
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+*.xdv
 
 # Misc
 TODO.md

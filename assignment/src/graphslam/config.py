@@ -211,8 +211,11 @@ class BackendConfig:
             point of having it (see the book, Sec. 9.3.3 and 9.5).
         relinearize_threshold: iSAM2 relinearization threshold.
         relinearize_skip: relinearize only every N-th update.
-        covariance_method: how the joint marginal covariance is recovered.
-            ``"auto"`` picks the fastest method your GTSAM build supports.
+        covariance_method: how the joint marginal covariance is recovered --
+            ``"bayes_tree"`` (default, the incremental Steiner-tree query that
+            GTSAM 4.3 exposes on ISAM2), ``"marginals"`` (batch, recomputed
+            each call) or ``"elimination"`` (explicit Hessian inverse). All
+            three give the same answer; they differ enormously in cost.
         robust_kernel: ``"none"`` or ``"huber"`` on the landmark measurement
             factors.
         huber_k: Huber parameter, in units of the whitened residual.
@@ -221,7 +224,7 @@ class BackendConfig:
     solver: str = "isam2"
     relinearize_threshold: float = 0.1
     relinearize_skip: int = 10
-    covariance_method: str = "auto"
+    covariance_method: str = "bayes_tree"
     robust_kernel: str = "none"
     huber_k: float = 1.345
 
@@ -230,7 +233,7 @@ class BackendConfig:
         if self.solver not in solver_options:
             raise ValueError(f"solver must be one of {solver_options}, got {self.solver}")
 
-        covariance_options = ["auto", "bayes_tree", "marginals", "elimination"]
+        covariance_options = ["bayes_tree", "marginals", "elimination"]
         if self.covariance_method not in covariance_options:
             raise ValueError(
                 f"covariance_method must be one of {covariance_options}, "

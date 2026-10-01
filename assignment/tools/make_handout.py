@@ -21,6 +21,30 @@ mechanism the EKF-SLAM handout used.
 Keeping one source of truth matters more than it sounds: the failure mode of a
 hand-maintained skeleton is that it quietly stops matching the solution the
 tests were written against, and nobody notices until the students do.
+
+One trap when checking the generated handout
+--------------------------------------------
+
+Both this directory and the handout install as the package ``graphslam``, and
+``pip install -e .`` registers *the environment*, not the directory you happen
+to be standing in. So after::
+
+    cd ../handout && pip install -e . --no-deps && pytest
+
+every later ``run_sim`` / ``run_real`` / ``pytest`` runs the handout's code, no
+matter which directory you are in -- including, confusingly, this one. The
+symptom is a traceback whose paths say ``handout\\src\\graphslam`` and a
+``NotImplementedError`` from a task you know is implemented.
+
+Point the install back when you are done::
+
+    cd ../assignment && pip install -e . --no-deps
+
+and check which tree is live with::
+
+    python -c "import graphslam, pathlib; print(pathlib.Path(graphslam.__file__).parent)"
+
+A second conda environment for the handout avoids the whole dance.
 """
 
 from __future__ import annotations
@@ -38,7 +62,14 @@ TODO = re.compile(r"^(?P<indent>\s*)# TODO\((?P<task>[^)]+)\):\s*(?P<text>.*)$")
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
 
 # Files copied into the handout verbatim, with no solution blocks inside.
-ALWAYS_COPY = ["configs", "tests", "docs", "README.md", "pyproject.toml"]
+ALWAYS_COPY = [
+    "configs",
+    "tests",
+    "docs",
+    "README.md",
+    "pyproject.toml",
+    "environment.yml",
+]
 
 
 @dataclass

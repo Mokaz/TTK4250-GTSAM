@@ -3,12 +3,15 @@ name = "graphslam"
 version = "1.0.0"
 description = "TTK4250 Group Assignment 2: factor graph SLAM with GTSAM"
 readme = "README.md"
-requires-python = ">=3.11"
+# GTSAM 4.3 publishes wheels for CPython 3.11-3.14; the upper bound turns a
+# missing wheel into a clear resolver error instead of a failed source build.
+requires-python = ">=3.11,<3.15"
 dependencies = [
-    # Pinned deliberately: the joint-covariance API differs between GTSAM
-    # releases, and graphslam.factor_graph.query_joint_covariance probes for
-    # what is available. Do not add dependencies beyond this list.
-    "gtsam>=4.2,<5",
+    # 4.3 is the first stable release exposing ISAM2.jointMarginalCovariance,
+    # which is what graphslam.factor_graph.query_joint_covariance calls. Older
+    # releases need a development build; do not relax this bound.
+    # Do not add dependencies beyond this list.
+    "gtsam>=4.3,<5",
     "matplotlib>=3.8",
     "numpy>=1.26",
     "omegaconf>=2.3",

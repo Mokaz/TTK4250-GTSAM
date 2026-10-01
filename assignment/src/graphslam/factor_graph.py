@@ -458,26 +458,47 @@ def extract_local_map(
 
 
 # ---------------------------------------------------------------------------
-# Raw covariance queries  (given -- these differ between GTSAM builds)
+# Raw covariance queries  (given)
 # ---------------------------------------------------------------------------
-
-
-_COVARIANCE_METHOD_CACHE: str | None = None
+#
+# Three routes to the same quantity. ``bayes_tree`` is the default and the only
+# one you need; the other two exist so you can time them against it.
 
 
 def _query_bayes_tree(isam2: gtsam.ISAM2, keys: list[int]) -> np.ndarray:
-    """Fastest path: ask the Bayes tree directly (Sec. 9.5)."""
+    """Ask the Bayes tree directly (Sec. 9.4, Sec. 9.5).
+
+    GTSAM walks the Steiner tree of the queried keys -- the cliques on the paths
+    joining them -- and compresses long non-branching stretches using shortcut
+    conditionals. The cost depends on how close the queried variables are in the
+    tree, not on how large the map is, which is what makes a joint covariance
+    per time step affordable at all.
+    """
     return isam2.jointMarginalCovariance(gtsam.KeyVector(keys)).fullMatrix()
 
 
 def _query_marginals(isam2: gtsam.ISAM2, keys: list[int]) -> np.ndarray:
-    """Portable path: rebuild a Marginals object over the whole graph."""
+    """Rebuild a batch ``Marginals`` over the whole graph and query that.
+
+    The same answer, recomputed from scratch on every call. Useful as a
+    reference implementation and as a timing baseline for the method above.
+    """
     marginals = gtsam.Marginals(isam2.getFactorsUnsafe(), isam2.calculateEstimate())
     return marginals.jointMarginalCovariance(gtsam.KeyVector(keys)).fullMatrix()
 
 
 def _query_elimination(isam2: gtsam.ISAM2, keys: list[int]) -> np.ndarray:
-    """Explicit path: linearize, marginalize, invert the Hessian (Sec. 9.4.1)."""
+    """Linearize, marginalize, then invert the Hessian by hand (Sec. 9.4.1).
+
+    The most explicit of the three: it forms ``R^T R`` restricted to the queried
+    variables and inverts it densely. Slow, and worth reading once, because it
+    is the formula from the book with nothing hidden behind an API.
+
+    One caveat: this linearizes at ``getLinearizationPoint()``, which is where
+    iSAM2 last relinearized and not necessarily the current estimate. Raise
+    ``backend.relinearize_threshold`` far enough and this method stops agreeing
+    exactly with the other two -- which is itself a nice thing to observe.
+    """
     linear_graph = isam2.getFactorsUnsafe().linearize(isam2.getLinearizationPoint())
     marginal_graph = linear_graph.marginal(gtsam.KeyVector(keys))
     hessian, _ = marginal_graph.hessian()
@@ -494,37 +515,27 @@ _COVARIANCE_QUERIES = {
 def query_joint_covariance(
     isam2: gtsam.ISAM2,
     keys: list[int],
-    method: str = "auto",
+    method: str = "bayes_tree",
 ) -> np.ndarray:
     """Recover the joint marginal covariance over ``keys`` from the back-end.
 
-    The blocks come back in **ascending key order** -- see
-    :func:`reorder_joint_covariance`.
+    The blocks come back in **ascending key order**, not in the order you asked
+    for them -- see :func:`reorder_joint_covariance`.
 
-    ``method="auto"`` probes once for the fast Bayes-tree query (which needs a
-    recent GTSAM) and falls back to the portable ``Marginals`` path otherwise.
-    The three methods compute the same quantity by different routes; comparing
-    their cost on Victoria Park is a worthwhile experiment in its own right.
+    All three methods compute the same quantity by different routes. Timing them
+    against each other on Victoria Park is a worthwhile experiment in itself:
+    set ``backend.covariance_method`` and compare the logged
+    ``duration_covariance_extraction``.
     """
-    global _COVARIANCE_METHOD_CACHE
+    try:
+        query = _COVARIANCE_QUERIES[method]
+    except KeyError:
+        raise ValueError(
+            f"Unknown covariance_method {method!r}, "
+            f"expected one of {sorted(_COVARIANCE_QUERIES)}"
+        ) from None
 
-    if method != "auto":
-        return _COVARIANCE_QUERIES[method](isam2, keys)
-
-    if _COVARIANCE_METHOD_CACHE is None:
-        for candidate in ("bayes_tree", "marginals", "elimination"):
-            try:
-                result = _COVARIANCE_QUERIES[candidate](isam2, keys)
-            except Exception:  # noqa: BLE001 - probing for API availability
-                continue
-            _COVARIANCE_METHOD_CACHE = candidate
-            print(f"[covariance] using the '{candidate}' recovery method")
-            return result
-        raise RuntimeError(
-            "No working joint-covariance recovery method found for this GTSAM build."
-        )
-
-    return _COVARIANCE_QUERIES[_COVARIANCE_METHOD_CACHE](isam2, keys)
+    return query(isam2, keys)
 
 
 def local_joint_covariance(

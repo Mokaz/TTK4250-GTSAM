@@ -27,7 +27,7 @@ backend:
   solver: isam2                  # "batch" re-solves the whole graph every step
   relinearize_threshold: 0.1     # TODO tune (Task 4)
   relinearize_skip: 10           # TODO tune (Task 4)
-  covariance_method: auto
+  covariance_method: bayes_tree      # "marginals" or "elimination" to compare
   robust_kernel: none            # "huber" (Task 4)
   huber_k: 1.345
 logging:
