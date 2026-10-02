@@ -14,8 +14,10 @@ from graphslam.factor_graph import (
     add_landmark_factor,
     add_odometry_factor,
     bearing_range_noise_model,
+    LocalMap,
     innovation_covariance,
     inverse_measurement,
+    local_joint_covariance,
     predict_measurement,
     predict_pose,
     reorder_joint_covariance,
@@ -330,6 +332,86 @@ def test_reorder_joint_covariance_preserves_symmetry_and_trace() -> None:
 def test_reorder_joint_covariance_rejects_mismatched_shapes() -> None:
     with pytest.raises(ValueError):
         reorder_joint_covariance(np.eye(5), [X(0), L(0)], [3, 3])
+
+
+def _small_isam2_problem() -> tuple[gtsam.ISAM2, gtsam.NonlinearFactorGraph, gtsam.Values]:
+    """Four poses and three landmarks, solved by iSAM2 with no lazy relinearization.
+
+    Each landmark is seen from a different subset of poses, so the landmark
+    blocks of the joint covariance all differ and a block in the wrong place
+    cannot pass by coincidence.
+    """
+    graph = gtsam.NonlinearFactorGraph()
+    values = gtsam.Values()
+
+    prior_noise = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.1, 0.1, 0.02]))
+    odometry_noise = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.2, 0.1, 0.05]))
+    measurement_noise = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.02, 0.3]))  # bearing, range
+
+    poses = [gtsam.Pose2(2.0 * k, 0.0, 0.1 * k) for k in range(4)]
+    landmarks = {0: np.array([3.0, 4.0]), 1: np.array([5.0, -3.0]), 2: np.array([8.0, 2.0])}
+    sightings = {0: [0, 1], 1: [1, 2, 3], 2: [3]}
+
+    graph.add(gtsam.PriorFactorPose2(X(0), poses[0], prior_noise))
+    for k, pose in enumerate(poses):
+        values.insert(X(k), pose)
+        if k > 0:
+            graph.add(gtsam.BetweenFactorPose2(X(k - 1), X(k), poses[k - 1].between(pose), odometry_noise))
+
+    for j, landmark in landmarks.items():
+        values.insert(L(j), landmark)
+        for k in sightings[j]:
+            graph.add(
+                gtsam.BearingRangeFactor2D(
+                    X(k), L(j), poses[k].bearing(landmark), poses[k].range(landmark), measurement_noise
+                )
+            )
+
+    params = gtsam.ISAM2Params()
+    params.setRelinearizeThreshold(0.0)
+    params.relinearizeSkip = 1
+    isam2 = gtsam.ISAM2(params)
+    isam2.update(graph, values)
+
+    return isam2, graph, isam2.calculateEstimate()
+
+
+@pytest.mark.parametrize("method", ["bayes_tree", "marginals", "elimination"])
+def test_local_joint_covariance_matches_gtsam_block_by_block(method: str) -> None:
+    """End to end through the real GTSAM queries, for every covariance method.
+
+    ``local_joint_covariance`` (given) queries GTSAM and hands the result to
+    your ``reorder_joint_covariance``. Every block of what comes out must match
+    the block GTSAM itself reports for that pair of keys.
+    """
+    isam2, graph, estimate = _small_isam2_problem()
+
+    config = SlamConfig()
+    config.backend.covariance_method = method
+    local_map = LocalMap(keys=[L(2), L(0), L(1)])  # deliberately not in key order
+
+    joint = local_joint_covariance(isam2, X(3), local_map, config)
+
+    keys = [X(3), L(2), L(0), L(1)]
+    dims = [3, 2, 2, 2]
+    offsets = np.concatenate([[0], np.cumsum(dims)]).astype(int)
+    reference = gtsam.Marginals(graph, estimate).jointMarginalCovariance(gtsam.KeyVector(keys))
+
+    assert joint.shape == (9, 9)
+    for i, key_i in enumerate(keys):
+        for j, key_j in enumerate(keys):
+            block = joint[offsets[i] : offsets[i + 1], offsets[j] : offsets[j + 1]]
+            np.testing.assert_allclose(
+                block,
+                reference.at(key_i, key_j),
+                atol=1e-8,
+                err_msg=(
+                    f"covariance_method={method!r}: block ({gtsam.Symbol(key_i).string()}, "
+                    f"{gtsam.Symbol(key_j).string()}) does not match GTSAM's own marginal. "
+                    "The rows and columns are permuted wrongly: the pose block must come first, "
+                    "then the landmarks in the order of local_map.keys."
+                ),
+            )
 
 
 # ---------------------------------------------------------------------------

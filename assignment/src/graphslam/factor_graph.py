@@ -281,8 +281,9 @@ def reorder_joint_covariance(
 ) -> np.ndarray:
     """Permute a GTSAM joint marginal covariance into the order *you* asked for.
 
-    GTSAM returns the blocks of a joint marginal ordered by **ascending key
-    value**, not in the order the keys were requested. Because
+    :func:`query_joint_covariance` returns the blocks of a joint marginal
+    ordered by **ascending key value**, not in the order the keys were
+    requested. Because
     ``gtsam.symbol_shorthand.L`` encodes the character ``'l'`` (108) and ``X``
     encodes ``'x'`` (120), every landmark key sorts *before* every pose key --
     so a query for ``[X(k), L(3), L(7)]`` comes back ordered
@@ -522,6 +523,11 @@ def query_joint_covariance(
     The blocks come back in **ascending key order**, not in the order you asked
     for them -- see :func:`reorder_joint_covariance`.
 
+    The three methods do not agree on block order by themselves: the Bayes-tree
+    and ``Marginals`` queries follow the order of the requested keys, while the
+    elimination route follows the factor graph's own key order. Querying with
+    the keys already sorted makes all three return the same layout.
+
     All three methods compute the same quantity by different routes. Timing them
     against each other on Victoria Park is a worthwhile experiment in itself:
     set ``backend.covariance_method`` and compare the logged
@@ -535,7 +541,7 @@ def query_joint_covariance(
             f"expected one of {sorted(_COVARIANCE_QUERIES)}"
         ) from None
 
-    return query(isam2, keys)
+    return query(isam2, sorted(keys))
 
 
 def local_joint_covariance(

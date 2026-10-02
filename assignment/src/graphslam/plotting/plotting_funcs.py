@@ -609,6 +609,14 @@ def plot_position_nis(
     if len(gnss) == 0:
         raise ValueError("At least one GNSS measurement is required.")
 
+    # A run cut short with --steps ends long before the GNSS log does. Samples
+    # outside the run's time span would all be matched to its first or last pose
+    # and show up as a huge, meaningless NIS, so leave them out.
+    in_run = (gnss[:, 0] >= poses_times[0]) & (gnss[:, 0] <= poses_times[-1])
+    gnss = gnss[in_run]
+    if len(gnss) == 0:
+        raise ValueError("No GNSS measurement falls inside the time span of the run.")
+
     nearest_pose_indices = nearest_indices(gnss[:, 0], poses_times)
     pose_xy = pose_xy[nearest_pose_indices]
     innovation_covs_xy = covs_xy[nearest_pose_indices] + np.eye(2) * (1.0**2)   # Hardcoding 1m GNSS sigma for NIS calculation

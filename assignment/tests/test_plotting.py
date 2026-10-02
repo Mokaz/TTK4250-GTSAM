@@ -139,6 +139,32 @@ def test_position_nis_plot_runs(plotted_run: Path) -> None:
     plt.close(fig)
 
 
+def test_position_nis_ignores_gnss_outside_the_run() -> None:
+    """A run cut short with ``--steps`` must not be compared with later GNSS.
+
+    The GNSS log covers the whole drive. Every sample after the last pose used
+    to be matched to that last pose, so a 2000-step Victoria Park run showed a
+    96 m "error" that was really just the car driving on without the filter.
+    """
+    from graphslam.plotting.plotting_funcs import plot_position_nis
+
+    # Ten poses driving along x at 1 m/s, one per second.
+    times = np.arange(10.0)
+    poses = np.column_stack([times, np.zeros(10), np.zeros(10)])
+    poses_covs = np.tile(np.diag([0.25, 0.25, 0.01]), (10, 1, 1))
+
+    # GNSS keeps logging for twice as long, and starts before the first pose.
+    gnss_times = np.arange(-5.0, 20.0)
+    gnss = np.column_stack([gnss_times, gnss_times, np.zeros_like(gnss_times)])
+
+    fig, ax = plot_position_nis(gnss=gnss, poses=poses, poses_covs=poses_covs, poses_times=times)
+
+    nis = ax.collections[0].get_offsets()[:, 1]
+    assert len(nis) == 10, f"only the 10 GNSS samples inside the run should be used, got {len(nis)}"
+    np.testing.assert_allclose(nis, 0.0, atol=1e-12)
+    plt.close(fig)
+
+
 @needs_data
 def test_plotter_replots_a_finished_run(plotted_run: Path, tmp_path: Path) -> None:
     """``plot_run <dir>`` must work on a run directory after the fact.

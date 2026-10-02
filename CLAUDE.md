@@ -82,7 +82,7 @@ Each is wrapped in `# TODO(<task>):` + `# BEGIN SOLUTION` / `# END SOLUTION`.
 
 Book references are to `sf2026c.pdf` (the 2026 edition with Lie theory).
 
-## Two conventions that silently produce a plausible wrong system
+## Three conventions that silently produce a plausible wrong system
 
 **Ordering.** Measurements are `[range, bearing]` everywhere in this code base.
 GTSAM's `BearingRangeFactor2D` wants bearing first.
@@ -93,14 +93,23 @@ estimate. Used together they are consistent; mixing either with a hand-derived
 `d/d[x, y, theta]` is not. Same applies to NEES — see
 `graphslam.utils.pose2_tangent_error`.
 
+**Block order.** GTSAM 4.3's `bayes_tree` and `marginals` joint-covariance
+queries return blocks in the order the keys were requested; the `elimination`
+route returns them in key order (every `L` key sorts before every `X` key).
+`query_joint_covariance` therefore always queries with sorted keys, which is
+what task (e) assumes. Until 1 Oct 2026 it did not, and the default path
+silently scrambled P: 14 m from GNSS instead of 1.5 m on Victoria Park, with
+every test green. `test_local_joint_covariance_matches_gtsam_block_by_block`
+guards it now; keep any new covariance route covered by it.
+
 ## Testing
 
-75 tests, ~5 s. The suite is also the grading instrument, so a test's failure
+79 tests, ~8 s. The suite is also the grading instrument, so a test's failure
 message is student-facing: write them that way.
 
 Run the handout through the suite after any change to the solution blocks — the
 expected result is that only the tests touching given code pass. That number is
-the scoring floor and is currently 23 of 75.
+the scoring floor and is currently 24 of 79.
 
 `tests/test_plotting.py` exists because every other test runs with
 `save_plots=False`; without it a rename in the plotting stack escapes the suite
@@ -108,18 +117,26 @@ and only explodes after a finished multi-minute run. Keep that covered.
 
 ## Measured
 
-Victoria Park, 2000 steps: ~22 s, ~91 it/s, 193 landmarks. Split roughly
-covariance 7.3 s / association 4.8 s / optimization 5.9 s. Per-step median
-9.4 ms, 95th percentile 20.8 ms.
+Victoria Park, 2000 steps, after the block-order fix: 141 landmarks, 1.5 m RMS
+from GNSS (GNSS ANIS 1.07 with the 1 m sigma), landmark ANIS 0.27.
+
+Absolute timings vary a lot with machine load: the same pre-fix code took 22 s
+in one session and 42 s in another. Compare back to back only. On 1 Oct, back to
+back: fixed 35 s of step time (optimization 11.2 / covariance 11.0 /
+association 7.3 / local-map extraction 4.7), pre-fix 40 s. Per-step median
+17.5 ms, 95th percentile 33 ms.
 
 ## Known gaps and open decisions
 
-- **`real_default.yaml` is over-conservative.** Landmark ANIS ≈ 0.24 against a
-  95% interval of [0.93, 1.07] — S is roughly 2x too wide. Task 3 text claims
-  "pretty good initial tuning values". Either retune or make the inconsistency
-  deliberate and say so in the text. Not yet decided.
-- **Scoring floor.** An empty submission passes 23/75, so "score = fraction of
-  tests passed" gives 31% for nothing.
+- **Tuning intent for `real_default.yaml`.** With S correct the shipped values
+  are GNSS-consistent (ANIS 1.07, 1.5 m RMS) but locally conservative (landmark
+  ANIS 0.27). Lowering odometry noise pushes landmark ANIS towards 1 but breaks
+  the run (370–470 landmarks, 35–70 m from GNSS): independent-increment
+  odometry cannot be right both per step and over a loop. Recommended: keep the
+  values, reword Task 3's "pretty good initial tuning values", make the gap the
+  lesson. Not yet decided.
+- **Scoring floor.** An empty submission passes 24/79, so "score = fraction of
+  tests passed" gives 30% for nothing.
 - **Task (c3) has one independent test.** Its other two tests fail on (d) first.
 - `jointMarginalSupportCliqueCount` is not in GTSAM 4.3, so
   `num_support_cliques` is always zero. The plots that used it are skipped

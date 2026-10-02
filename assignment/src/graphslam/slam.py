@@ -123,8 +123,9 @@ class Backend:
 
         keys = [pose_key] + list(local_map.keys)
         dims = [3] + [2] * len(local_map)
+        # Queried in key order, to match what reorder_joint_covariance expects.
         marginals = gtsam.Marginals(self.graph, self._estimate)
-        covariance = marginals.jointMarginalCovariance(gtsam.KeyVector(keys)).fullMatrix()
+        covariance = marginals.jointMarginalCovariance(gtsam.KeyVector(sorted(keys))).fullMatrix()
         return fg.reorder_joint_covariance(covariance, keys, dims)
 
 
