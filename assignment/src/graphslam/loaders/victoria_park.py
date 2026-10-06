@@ -29,7 +29,8 @@ class RawLidarStepInput:
 class VictoriaParkLoader:
     name = "victoria_park"
 
-    def __init__(self, data_folder: Path | None = None):
+    def __init__(self, data_folder: Path | None = None, initial_heading_deg: float = 36.0):
+        self.initial_heading_deg = initial_heading_deg
         if data_folder is None:
             data_folder = victoria_park_folder()
 
@@ -257,11 +258,12 @@ class VictoriaParkLoader:
         gnss = self.gnss
         return np.delete(gnss, find_gnss_outliers(gnss), axis=0)
 
-    @property 
+    @property
     def initial_pose(self) -> np.ndarray:
+        """First GNSS fix for the position; heading from ``victoria_park.initial_heading_deg``."""
         return np.array(
-            [self.gnss_longitude[0], self.gnss_latitude[0], np.deg2rad(36)]
-        ) 
+            [self.gnss_longitude[0], self.gnss_latitude[0], np.deg2rad(self.initial_heading_deg)]
+        )
     
 
 GNSS_MAX_SPEED_M_S = 1

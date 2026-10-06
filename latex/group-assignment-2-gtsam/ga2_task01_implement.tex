@@ -3,7 +3,7 @@
 Where EKF-SLAM had a \pythoninline{predict} and an \pythoninline{update}, a factor graph SLAM system has three jobs: build the graph, recover a covariance from it, and use that covariance to decide which measurement belongs to which landmark.
 The back-end (iSAM2, through GTSAM) does the optimization for you; everything below is the part it does \emph{not} do.
 
-All functions are marked with \pythoninline{# TODO} in the code, and the score is based on the number of tests passed. Run them with \pythoninline{pytest}.
+All functions are marked with \pythoninline{# TODO} in the code. Run the tests with \pythoninline{pytest}: how many of them pass is part of how we evaluate your submission as a whole.
 
 Two conventions are worth fixing in your head before you start, because both produce systems that run happily while being wrong:
 \begin{itemize}

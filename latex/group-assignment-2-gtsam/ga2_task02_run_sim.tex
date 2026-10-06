@@ -8,7 +8,7 @@ You are given a data set consisting of
     \item landmarks (M, 2): the ground truth landmarks
 \end{itemize}
 
-We have given you a set of pretty good initial tuning values (marked with \pythoninline{# TODO tune} in \pythoninline{configs/sim_default.yaml}). We want you to find 3 different sets of tuning values that differ in different ways and explain the results you get using them.
+We have given you initial tuning values in \pythoninline{configs/sim_default.yaml}; everything marked \pythoninline{# TODO tune} is yours to change. They are a \emph{working baseline}: the estimate stays close to the ground truth, but the filter is somewhat conservative, and both the landmark NIS and the pose NEES sit below their expected values. We want you to find 3 different sets of tuning values that differ in different ways and explain the results you get using them.
 
 An example of three different sets of tuning values could be
 \begin{itemize}

@@ -16,7 +16,7 @@ def run_real(
     show_plots: bool = False,
     save_plots: bool = True,
 ) -> None:
-    dataset = VictoriaParkLoader()
+    dataset = VictoriaParkLoader(initial_heading_deg=config.victoria_park.initial_heading_deg)
     return run_slam(
         config=config,
         dataset=dataset,

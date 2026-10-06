@@ -17,7 +17,9 @@ The dataset consists of
     \item timeGps (Kgps,): Time of GPS measurements in milliseconds
 \end{itemize}
 
-Similar as in the previous task we have given you pretty good initial tuning values (in \pythoninline{configs/real_default.yaml}). In the same way as previously, we want you to find 3 different sets of tuning values that differ in different ways and explain the results you get using them.
+As in the previous task, we have given you initial tuning values in \pythoninline{configs/real_default.yaml}. They are a \emph{working baseline}: the map is clean, loops close, and the trajectory stays close to the GPS. They are, however, not consistent: the landmark NIS sits well below its expected value. Finding out why is the main point of this task.
+
+In the same way as previously, we want you to find 3 different sets of tuning values that differ in different ways and explain the results you get using them. At least one of the sets should lower the odometry noise to bring the landmark NIS closer to its expected value. Describe what happens to the map and to the trajectory compared with the GPS, and explain why. It helps to recall what your \pythoninline{preintegrate} from Task~\ref{q:task01} assumes about consecutive odometry increments, and to compare that with how wheel-odometry errors behave on a real car.
 
 See the linked webpage and the files in the Victoria Park folder for further information.
 The same reasoning applies to NIS and tuning here as in the simulated dataset.
@@ -25,6 +27,7 @@ The same reasoning applies to NIS and tuning here as in the simulated dataset.
 Note that you can use the GPS as a sort of ground truth, but it is very much less than perfect.
 You might want to use a NIS calculation instead of NEES calculation if you do that.
 Some comparison to the GPS is, however, expected.
+The position NIS plot treats each GPS sample as a position measurement with standard deviation \pythoninline{noise.sigma_gnss} (1\,m by default). This value is an assumption about the GPS, not a filter parameter: it never enters the graph, but it sets the scale of that plot, so keep it in mind when you interpret it.
 
 \hfill
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from graphslam.config import (
@@ -62,3 +63,17 @@ def test_unknown_association_method_is_rejected() -> None:
 def test_unknown_solver_is_rejected() -> None:
     with pytest.raises(ValueError):
         BackendConfig(solver="wishful-thinking")
+
+
+def test_victoria_park_initial_heading_is_configurable() -> None:
+    assert SlamConfig().victoria_park.initial_heading_deg == 36.0
+    assert SlamConfig.load(CONFIGS / "real_default.yaml").victoria_park.initial_heading_deg == 36.0
+
+    try:
+        from graphslam.loaders.victoria_park import VictoriaParkLoader
+
+        loader = VictoriaParkLoader(initial_heading_deg=10.0)
+    except FileNotFoundError:
+        pytest.skip("Victoria Park data set not found")
+
+    assert loader.initial_pose[2] == pytest.approx(np.deg2rad(10.0))

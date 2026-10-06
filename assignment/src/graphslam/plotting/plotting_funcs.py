@@ -587,9 +587,15 @@ def plot_position_nis(
     poses: np.ndarray,
     poses_covs: np.ndarray,
     poses_times: np.ndarray,
+    sigma_gnss: float = 1.0,
     ax: plt.Axes | None = None,
 ) -> tuple[plt.Figure, plt.Axes]:
-    """Plot NIS between GNSS samples and nearest-in-time pose estimates."""
+    """Plot NIS between GNSS samples and nearest-in-time pose estimates.
+
+    ``sigma_gnss`` is the assumed std. dev. of each GNSS position component, set
+    by ``noise.sigma_gnss`` in the config. The NIS treats GNSS as a measurement
+    of the position with covariance ``sigma_gnss**2 * I``.
+    """
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 3), tight_layout=True)
     else:
@@ -619,7 +625,7 @@ def plot_position_nis(
 
     nearest_pose_indices = nearest_indices(gnss[:, 0], poses_times)
     pose_xy = pose_xy[nearest_pose_indices]
-    innovation_covs_xy = covs_xy[nearest_pose_indices] + np.eye(2) * (1.0**2)   # Hardcoding 1m GNSS sigma for NIS calculation
+    innovation_covs_xy = covs_xy[nearest_pose_indices] + np.eye(2) * sigma_gnss**2
 
     innovation_xy = pose_xy - gnss[:, 1:3]
     nis_xy = np.einsum("ij,ijk,ik->i", innovation_xy, np.linalg.inv(innovation_covs_xy), innovation_xy)
@@ -635,7 +641,10 @@ def plot_position_nis(
     ax.axhline(nis_lower, ls="--", c="orange", lw=1, label=r"$\chi^2_{2,0.05}$")
     ax.set_xlabel("Scan step")
     ax.set_ylabel(r"NIS")
-    ax.set_title(f"NIS-position | ANIS = {anis_xy:.2f} | inliers = {inlier_frac:.0%}")
+    ax.set_title(
+        f"NIS-position | ANIS = {anis_xy:.2f} | inliers = {inlier_frac:.0%}"
+        f" | GNSS sigma = {sigma_gnss:g} m"
+    )
     ax.grid(True, lw=0.4)
     ax.legend()
 

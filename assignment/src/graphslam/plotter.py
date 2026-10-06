@@ -189,6 +189,7 @@ class SlamRunPlotter:
             poses       = self.snapshots[-1].get("poses"),
             poses_covs  = self.snapshots[-1].get("poses_covariance"),
             poses_times = self.steps.get("scan_time"),
+            sigma_gnss  = self.config.noise.sigma_gnss,
         )
 
         return fig, ax

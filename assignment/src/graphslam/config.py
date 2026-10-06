@@ -43,6 +43,9 @@ class NoiseConfig:
         sigma_init_pose_x: std. dev. of the initial pose prior in x [m].
         sigma_init_pose_y: std. dev. of the initial pose prior in y [m].
         sigma_init_pose_yaw_deg: std. dev. of the initial pose prior in yaw [deg].
+        sigma_gnss: std. dev. of each GNSS position component [m]. GNSS is never
+            added to the graph; this only sets the reference uncertainty in the
+            position-NIS plot, and with it the vertical scale of that plot.
     """
 
     sigma_velocity: float = 0.1
@@ -58,6 +61,8 @@ class NoiseConfig:
     sigma_init_pose_x: float = 0.05
     sigma_init_pose_y: float = 0.05
     sigma_init_pose_yaw_deg: float = 0.5
+
+    sigma_gnss: float = 1.0
 
     def __post_init__(self) -> None:
         for field_name, value in self.__dict__.items():
@@ -257,6 +262,28 @@ class BackendConfig:
 
 
 @dataclass
+class VictoriaParkConfig:
+    """Settings that only apply to the Victoria Park data set.
+
+    Attributes:
+        initial_heading_deg: heading of the first pose in the GNSS east/north
+            frame [deg]. The first position is taken from the first GNSS fix,
+            but GNSS gives no heading, so this one is fixed by hand. SLAM cannot
+            observe it -- turning it rotates the whole map and trajectory
+            without changing their shape -- so it matters only for comparing
+            against GNSS. 36 deg is inherited from the EKF-SLAM assignment and
+            is the best-fit rotation of the estimate onto GNSS to within
+            0.01 deg. Its prior std. dev. is ``noise.sigma_init_pose_yaw_deg``.
+    """
+
+    initial_heading_deg: float = 36.0
+
+    def __post_init__(self) -> None:
+        if not np.isfinite(self.initial_heading_deg):
+            raise ValueError(f"initial_heading_deg must be finite, got {self.initial_heading_deg}")
+
+
+@dataclass
 class LoggingConfig:
     """Diagnostic logging. Larger strides mean smaller run directories."""
 
@@ -294,6 +321,7 @@ class SlamConfig:
     )
     association: AssociationConfig = field(default_factory=AssociationConfig)
     backend: BackendConfig = field(default_factory=BackendConfig)
+    victoria_park: VictoriaParkConfig = field(default_factory=VictoriaParkConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
     @classmethod

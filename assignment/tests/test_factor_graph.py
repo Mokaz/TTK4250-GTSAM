@@ -114,6 +114,12 @@ def test_add_odometry_factor_uses_the_full_covariance() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _exact_measurement(pose: gtsam.Pose2, landmark: np.ndarray) -> np.ndarray:
+    """[range, bearing] straight from GTSAM, so these tests do not lean on (d)."""
+    point = gtsam.Point2(*landmark)
+    return np.array([pose.range(point), pose.bearing(point).theta()])
+
+
 def _config_with(**noise_overrides) -> SlamConfig:
     config = SlamConfig()
     for name, value in noise_overrides.items():
@@ -124,7 +130,7 @@ def _config_with(**noise_overrides) -> SlamConfig:
 def test_add_landmark_factor_has_zero_error_at_the_exact_solution() -> None:
     pose = gtsam.Pose2(1.0, 2.0, 0.4)
     landmark = np.array([6.0, 5.0])
-    measurement, _, _ = predict_measurement(pose, landmark)
+    measurement = _exact_measurement(pose, landmark)
 
     graph = gtsam.NonlinearFactorGraph()
     add_landmark_factor(
@@ -167,7 +173,7 @@ def test_landmark_noise_model_is_ordered_bearing_then_range() -> None:
 
     pose = gtsam.Pose2(0.0, 0.0, 0.0)
     landmark = np.array([10.0, 0.0])
-    measurement, _, _ = predict_measurement(pose, landmark)
+    measurement = _exact_measurement(pose, landmark)
 
     graph = gtsam.NonlinearFactorGraph()
     add_landmark_factor(graph, X(0), L(0), measurement, bearing_range_noise_model(config))

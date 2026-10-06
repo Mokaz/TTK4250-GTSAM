@@ -165,6 +165,29 @@ def test_position_nis_ignores_gnss_outside_the_run() -> None:
     plt.close(fig)
 
 
+def test_position_nis_uses_the_configured_gnss_sigma() -> None:
+    """``noise.sigma_gnss`` must reach the NIS; it used to be a hardcoded 1 m."""
+    from graphslam.plotting.plotting_funcs import plot_position_nis
+
+    times = np.arange(5.0)
+    poses = np.column_stack([times, np.zeros(5), np.zeros(5)])
+    poses_covs = np.zeros((5, 3, 3))  # all the uncertainty is the GNSS's
+    gnss = np.column_stack([times, times + 1.0, np.zeros(5)])  # 1 m off in x
+
+    fig, ax = plot_position_nis(
+        gnss=gnss, poses=poses, poses_covs=poses_covs, poses_times=times, sigma_gnss=2.0
+    )
+
+    nis = ax.collections[0].get_offsets()[:, 1]
+    np.testing.assert_allclose(nis, (1.0 / 2.0) ** 2)
+    plt.close(fig)
+
+
+def test_shipped_real_config_keeps_the_one_metre_gnss_sigma() -> None:
+    config = SlamConfig.load(ROOT / "configs" / "real_default.yaml")
+    assert config.noise.sigma_gnss == 1.0
+
+
 @needs_data
 def test_plotter_replots_a_finished_run(plotted_run: Path, tmp_path: Path) -> None:
     """``plot_run <dir>`` must work on a run directory after the fact.

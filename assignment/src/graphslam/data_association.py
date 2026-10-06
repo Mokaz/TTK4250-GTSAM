@@ -74,7 +74,8 @@ def JCBB_association(
     ic = individual_compatibility(z, zbar, S)
     g2 = chi2.isf(1 - alpha_individual, 2)
 
-    # Associate the least ambiguous measurements first: it prunes harder.
+    # Associate the most confident measurements first (smallest best-match
+    # distance): good hypotheses are found early, which prunes harder.
     order = np.argsort(np.amin(ic, axis=1))
     z_ordered = z[order]
     ic_ordered = ic[order]
@@ -114,6 +115,13 @@ def _jcbb_recursive(z, zbar, S, alpha_joint, g2, j, a, ic, abest):
             ic[j:, i] = ici
 
     # Leaving measurement j unassociated, but only if we can still win.
+    # Skipping j leaves at most M - j - 1 further pairings, so this explores the
+    # branch only if it could get strictly MORE pairings than the best so far:
+    # the bound from the original JCBB paper (Neira & Tardos, 2001). Sec. 7.3.2
+    # of the book says "at least as many", i.e. ``n + (M - j - 1) >= ...``,
+    # which also explores branches that could only tie and lets the NIS
+    # tie-break above choose between them. On Victoria Park both give the same
+    # associations, and the book's version costs about 50% more search time.
     if n + (M - j - 2) >= num_associations(abest):
         a[j] = -1
         abest = _jcbb_recursive(z, zbar, S, alpha_joint, g2, j + 1, a, ic, abest)

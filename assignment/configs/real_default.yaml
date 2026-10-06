@@ -11,6 +11,7 @@ noise:
   sigma_init_pose_x: 0.1
   sigma_init_pose_y: 0.1
   sigma_init_pose_yaw_deg: 0.1
+  sigma_gnss: 1.0                # assumed GNSS accuracy [m]; never fed to the graph, only scales the GNSS NIS plot
 sensor:
   range_local: 50.0              # TODO tune
   bearing_local_deg: 100.0       # TODO tune
@@ -30,6 +31,10 @@ backend:
   covariance_method: bayes_tree      # "marginals" or "elimination" to compare
   robust_kernel: none            # "huber" (Task 4)
   huber_k: 1.345
+victoria_park:
+  # Heading of the first pose in the GNSS frame. GNSS gives no heading and SLAM
+  # cannot observe it: changing it rotates the whole solution, nothing else.
+  initial_heading_deg: 36.0
 logging:
   # On: this is what feeds the landmark-NIS plot, which is the only consistency
   # check Victoria Park gives you (there is no ground truth, so no NEES). Every

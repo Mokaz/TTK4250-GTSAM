@@ -104,12 +104,13 @@ guards it now; keep any new covariance route covered by it.
 
 ## Testing
 
-79 tests, ~8 s. The suite is also the grading instrument, so a test's failure
+82 tests, ~8 s. The suite is also the grading instrument, so a test's failure
 message is student-facing: write them that way.
 
 Run the handout through the suite after any change to the solution blocks — the
-expected result is that only the tests touching given code pass. That number is
-the scoring floor and is currently 24 of 79.
+expected result is that only the tests touching given code pass, currently 27
+of 82. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
+check that no graded work hides behind a given-code test, not a scoring floor.
 
 `tests/test_plotting.py` exists because every other test runs with
 `save_plots=False`; without it a rename in the plotting stack escapes the suite
@@ -128,24 +129,34 @@ association 7.3 / local-map extraction 4.7), pre-fix 40 s. Per-step median
 
 ## Known gaps and open decisions
 
-- **Tuning intent for `real_default.yaml`.** With S correct the shipped values
-  are GNSS-consistent (ANIS 1.07, 1.5 m RMS) but locally conservative (landmark
-  ANIS 0.27). Lowering odometry noise pushes landmark ANIS towards 1 but breaks
-  the run (370–470 landmarks, 35–70 m from GNSS): independent-increment
-  odometry cannot be right both per step and over a loop. Recommended: keep the
-  values, reword Task 3's "pretty good initial tuning values", make the gap the
-  lesson. Not yet decided.
-- **Scoring floor.** An empty submission passes 24/79, so "score = fraction of
-  tests passed" gives 30% for nothing.
-- **Task (c3) has one independent test.** Its other two tests fail on (d) first.
+- **Tuning intent for `real_default.yaml` (decided 2 Oct).** The shipped values
+  are a working baseline, deliberately not consistent: GNSS-consistent (ANIS
+  1.07, 1.5 m RMS) but locally conservative (landmark ANIS 0.27). Lowering
+  odometry noise pushes landmark ANIS towards 1 but breaks the run (370–470
+  landmarks, 35–70 m from GNSS), because independent-increment odometry cannot
+  be right both per step and over a loop. Task 3 now says so and asks for one
+  tuning set that lowers the odometry noise. Do not "fix" the tuning.
+- **Pass/fail (decided 2 Oct).** The number of tests passed is not a score;
+  it feeds an overall evaluation of the submission together with the report.
+  `ga2_graded2.tex` and `ga2_task01_implement.tex` say so. The text talks about
+  neither grades nor points anywhere; keep it that way.
 - `jointMarginalSupportCliqueCount` is not in GTSAM 4.3, so
   `num_support_cliques` is always zero. The plots that used it are skipped
   unless a patched build fills it in.
 - Full 7300-step Victoria Park run not yet timed; the `--steps` figure in the
   assignment text is provisional.
-- `Car.a` / `Car.b` (lidar offset) parsed but unused.
-- `plot_position_nis` hardcodes a 1 m GNSS sigma.
+- `Car.a` / `Car.b` (lidar offset) parsed but unused. Backlogged (2 Oct) as a
+  possible optional exercise; the system works without it.
 - Reference solution not yet solved once from the student side and timed.
+- Victoria Park start heading is `victoria_park.initial_heading_deg` (36°,
+  inherited from the EKF-SLAM assignment). Best-fit rotation onto GNSS over
+  2000 steps is 35.99°, so leave it. It is unobservable: changing it rotates
+  the whole solution and only affects the GNSS comparison.
+- JCBB's skip-branch bound (`data_association.py`, `n + (M - j - 2) >=`) is
+  the strict one from Neira & Tardós: it prunes branches that could only tie
+  on pairings. The book (Sec. 7.3.2) says "at least as many". The book's
+  version gave identical results on 2000 Victoria Park steps and 48% more
+  association time. Kept, with a comment saying all of this (6 Oct).
 
 ## Working style for this repo
 
