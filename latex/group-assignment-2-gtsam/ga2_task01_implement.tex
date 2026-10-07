@@ -13,7 +13,7 @@ Two conventions are worth fixing in your head before you start, because both pro
 
 \begin{parts}
 
-    % ------------------------------------------------------------------ (a)
+    % ------------------------------------------------------------------ (a) % TODO ADD: gtsam.Pose2.Expmap expects np.array 
     \part Implement \input{py/gtsam/a/def.tex}, which turns one wheel-encoder reading into a relative pose increment.
 
     The Victoria Park vehicle reports a forward speed \(v_e\) measured at the left rear wheel and a steering angle \(\alpha\). The encoder sits a distance \(H\) off the centre line, so during a turn it travels along a different arc than the centre of the rear axle. With \(L\) the axle distance, the kinematic bicycle model gives the body twist
@@ -80,7 +80,7 @@ Two conventions are worth fixing in your head before you start, because both pro
 
     Here is the part that has no EKF-SLAM counterpart. The EKF carried \(P\) around explicitly and handed it to you. A factor graph stores \emph{information}, not covariance, so before anything can be gated the joint marginal over the current pose and the nearby landmarks has to be \emph{recovered} from the back-end. That is Sec.\ 9.4: (9.27)--(9.28) show how the pose and pose-landmark blocks are extracted by back-substitution in \(R\), and Sec.\ 9.4.2 notes that pure landmark covariances are harder still because they are spread around in \(R\). GTSAM does this for you through the Bayes tree; the function \pythoninline{query_joint_covariance} is given.
 
-    What is \emph{not} done for you is the bookkeeping. GTSAM returns the blocks of a joint marginal ordered by ascending key value, not in the order you asked for them. Since \pythoninline{gtsam.symbol_shorthand.L} encodes the character \texttt{'l'} (108) and \pythoninline{X} encodes \texttt{'x'} (120), every landmark key sorts before every pose key: a query for \(\left[X(k), L(3), L(7)\right]\) comes back ordered \(\left[L(3), L(7), X(k)\right]\). Stack a measurement Jacobian against that without noticing and the result is an innovation covariance that is subtly, silently wrong.
+    What is \emph{not} done for you is the bookkeeping. \pythoninline{query_joint_covariance} returns the blocks of a joint marginal ordered by ascending key value, not in the order you asked for them. (GTSAM's own routes do not agree on block order, so the given code always queries in key order to make them consistent.) Since \pythoninline{gtsam.symbol_shorthand.L} encodes the character \texttt{'l'} (108) and \pythoninline{X} encodes \texttt{'x'} (120), every landmark key sorts before every pose key: a query for \(\left[X(k), L(3), L(7)\right]\) comes back ordered \(\left[L(3), L(7), X(k)\right]\). Stack a measurement Jacobian against that without noticing and the result is an innovation covariance that is subtly, silently wrong.
 
     \begin{solution} \input{py/gtsam/e/solu.tex} \end{solution}
 

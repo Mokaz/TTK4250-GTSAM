@@ -21,6 +21,15 @@ As in the previous task, we have given you initial tuning values in \pythoninlin
 
 In the same way as previously, we want you to find 3 different sets of tuning values that differ in different ways and explain the results you get using them. At least one of the sets should lower the odometry noise to bring the landmark NIS closer to its expected value. Describe what happens to the map and to the trajectory compared with the GPS, and explain why. It helps to recall what your \pythoninline{preintegrate} from Task~\ref{q:task01} assumes about consecutive odometry increments, and to compare that with how wheel-odometry errors behave on a real car.
 
+\textbf{Plan your runs.} A full run over the data set (the default: all 7247 laser scans) takes a few minutes. It took about 2.5 minutes on our machine with the given tuning, and about twice that with a tuning that makes the map grow, such as lowered odometry noise. Expect it to take longer on a laptop. To find good values without spending hours waiting:
+\begin{itemize}
+    \item Explore with \pythoninline{run_real --steps 2000}, which takes about 20 seconds. The first 2000 scans cover about a quarter of the drive and most of the park, including the first loop closures, and a change in tuning moves the results in the same direction as it does on a full run.
+    \item Change one group of parameters at a time (odometry noise, measurement noise, gates, landmark birth), so that you know what caused what.
+    \item Watch the number of landmarks. The given tuning ends the first 2000 scans with about 140. Several hundred means data association is failing, and that tuning will only get worse, and slower, over the full run.
+    \item Give every run its own \pythoninline{--output-dir}, and re-plot a finished run with \pythoninline{plot_run} instead of running it again.
+\end{itemize}
+All figures and numbers in your report should come from full runs. This matters most for the runtime plot below: the per-step cost roughly triples after scan 5000, when the car revisits earlier parts of the park, and a short run never gets there.
+
 See the linked webpage and the files in the Victoria Park folder for further information.
 The same reasoning applies to NIS and tuning here as in the simulated dataset.
 

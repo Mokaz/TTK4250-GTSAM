@@ -78,19 +78,28 @@ def test_pipeline_runs_and_tracks_the_trajectory(tmp_path: Path) -> None:
     assert _position_rmse(poses, poses_gt) < 2.0
 
 
-def test_ground_truth_association_is_at_least_as_good(tmp_path: Path) -> None:
-    """Perfect association must not make the estimate worse.
+def test_the_baseline_map_has_no_duplicate_or_spurious_landmarks(tmp_path: Path) -> None:
+    """Every true landmark seen should end up in the map exactly once.
 
-    If it does, something is wrong upstream of the front-end: the models, the
-    noise, or the way the graph is being built.
+    With the shipped tuning, association does not fail on this data set. A
+    duplicate or a spurious landmark here means a measurement was not matched to
+    the landmark it came from -- usually because the innovation covariance from
+    Task 1 (e) or (f), or the measurement model from (d), is wrong.
     """
-    jcbb_snapshot, poses_gt = _run(tmp_path / "jcbb")
-    gt_snapshot, _ = _run(tmp_path / "gt", association={"method": "gt"})
+    from graphslam.evaluation import map_quality
+    from graphslam.loaders.simulated import SimulatedDataLoader
 
-    jcbb_rmse = _position_rmse(jcbb_snapshot["poses"], poses_gt)
-    gt_rmse = _position_rmse(gt_snapshot["poses"], poses_gt)
+    snapshot, _ = _run(tmp_path)
+    dataset = SimulatedDataLoader(SIMULATED)
+    quality = map_quality(
+        snapshot["landmarks"],
+        dataset.landmarks_gt,
+        observed=dataset.observed_landmarks(len(snapshot["poses"])),
+    )
 
-    assert gt_rmse <= jcbb_rmse + 0.5
+    assert quality.duplicates == 0, f"duplicate landmarks in the map: {quality}"
+    assert quality.spurious == 0, f"spurious landmarks in the map: {quality}"
+    assert quality.missed <= 2, f"true landmarks seen but never mapped: {quality}"
 
 
 def test_pose_covariances_are_valid(tmp_path: Path) -> None:
@@ -108,3 +117,53 @@ def test_uncertainty_grows_away_from_the_prior(tmp_path: Path) -> None:
 
     covariances = snapshot["poses_covariance"]
     assert np.trace(covariances[-1]) > np.trace(covariances[0])
+
+
+def _interrupted_dataset(after_steps: int):
+    """The simulated set, with Ctrl+C pressed while step ``after_steps`` runs."""
+    from graphslam.loaders.simulated import SimulatedDataLoader
+
+    class Interrupted(SimulatedDataLoader):
+        def iterate_slam(self, config, max_steps=None):
+            for k, step in enumerate(super().iterate_slam(config, max_steps)):
+                if k == after_steps:
+                    raise KeyboardInterrupt
+                yield step
+
+    return Interrupted(SIMULATED)
+
+
+def test_an_interrupted_run_is_saved_and_can_be_plotted(tmp_path: Path) -> None:
+    import json
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from graphslam.plotter import SlamRunPlotter
+
+    config = SlamConfig.load(ROOT / "configs" / "sim_default.yaml")
+    run_slam(config, _interrupted_dataset(30), tmp_path, num_steps=STEPS, save_plots=False)
+
+    metadata = json.loads((tmp_path / "metadata.json").read_text())
+    steps = SlamLogger.load_steps(tmp_path)
+    snapshot = SlamLogger.load_snapshot(tmp_path / "snapshots" / "snap_final.npz")
+
+    assert metadata.get("aborted") is True, "an interrupted run should be marked as aborted"
+    assert len(steps["scan_step"]) == 30
+    assert len(snapshot["poses"]) == 30, "one pose per completed step"
+
+    plotter = SlamRunPlotter.from_run(tmp_path)
+    plotter.plot_all(save=True, show=False)
+    assert (tmp_path / "figures" / "final_snapshot.pdf").exists()
+
+
+def test_an_interrupted_run_is_discarded_without_save_on_abort(tmp_path: Path) -> None:
+    config = SlamConfig.load(ROOT / "configs" / "sim_default.yaml")
+
+    with pytest.raises(KeyboardInterrupt):
+        run_slam(
+            config, _interrupted_dataset(30), tmp_path, num_steps=STEPS,
+            save_plots=False, save_on_abort=False,
+        )
+
+    assert not (tmp_path / "metadata.json").exists()

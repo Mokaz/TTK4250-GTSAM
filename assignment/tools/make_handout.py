@@ -69,6 +69,7 @@ ALWAYS_COPY = [
     "README.md",
     "pyproject.toml",
     "environment.yml",
+    "typings",
 ]
 
 
@@ -173,10 +174,39 @@ def strip(path: Path) -> str:
     return "\n".join(out) + "\n"
 
 
+# README lines that only make sense in the reference solution, and what the
+# handout gets instead. Exact matches, so an edited README fails loudly here
+# instead of shipping staff notes to students.
+README_REPLACEMENTS = [
+    (
+        "> **This directory is the reference solution**, not the handout. Generate the\n"
+        "> student version with `python tools/make_handout.py --out ../handout`.\n\n",
+        "",
+    ),
+    (
+        "tools/            handout generation and create_handin.py\n",
+        "create_handin.py  zips your code and configs for the hand-in\n",
+    ),
+]
+
+
+def handout_readme(text: str) -> str:
+    for old, new in README_REPLACEMENTS:
+        if text.count(old) != 1:
+            raise ValueError(f"README.md no longer contains exactly one copy of: {old[:60]!r}")
+        text = text.replace(old, new)
+    return text
+
+
 def write_handout(destination: Path) -> None:
-    if destination.exists():
-        shutil.rmtree(destination)
-    destination.mkdir(parents=True)
+    # Empty the folder rather than deleting it: on Windows a folder that an
+    # editor or a shell has open cannot be removed, but its contents can.
+    destination.mkdir(parents=True, exist_ok=True)
+    for child in destination.iterdir():
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
 
     for name in ALWAYS_COPY:
         source = SOURCE_ROOT / name
@@ -198,6 +228,9 @@ def write_handout(destination: Path) -> None:
         text = strip(source)
         target.write_text(text, encoding="utf-8")
         stripped += text.count("raise NotImplementedError")
+
+    readme = destination / "README.md"
+    readme.write_text(handout_readme(readme.read_text(encoding="utf-8")), encoding="utf-8")
 
     shutil.copy2(Path(__file__).parent / "create_handin.py", destination / "create_handin.py")
 

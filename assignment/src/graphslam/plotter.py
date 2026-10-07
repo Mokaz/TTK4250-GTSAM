@@ -10,6 +10,7 @@ import numpy as np
 from graphslam.loaders.victoria_park import VictoriaParkLoader
 from graphslam.loaders.simulated import SimulatedDataLoader
 from graphslam.config import SlamConfig
+from graphslam.evaluation import MapQuality, map_quality
 from graphslam.logger import SlamLogger
 from graphslam.plotting.plotting_funcs import (
     plot_estimate,
@@ -37,6 +38,7 @@ class SlamRunPlotter:
     gnss: np.ndarray | None = None
     gt_poses: np.ndarray | None = None
     gt_landmarks: np.ndarray | None = None
+    observed_landmarks: np.ndarray | None = None
 
     @classmethod
     def from_run(cls, run_dir: Path | str) -> SlamRunPlotter:
@@ -45,6 +47,7 @@ class SlamRunPlotter:
         gnss = None
         gt_poses = None
         gt_landmarks = None
+        observed_landmarks = None
 
         metadata = SlamLogger.load_metadata(run_path)
         dataset = metadata["dataset"]
@@ -53,6 +56,7 @@ class SlamRunPlotter:
             loader = SimulatedDataLoader()
             gt_poses = loader.poses_gt
             gt_landmarks = loader.landmarks_gt
+            observed_landmarks = loader.observed_landmarks(metadata["num_poses"])
         elif dataset == "victoria_park":
             loader = VictoriaParkLoader()
             gnss = loader.gnss_filtered
@@ -68,6 +72,7 @@ class SlamRunPlotter:
             gnss         = gnss,
             gt_poses     = gt_poses,
             gt_landmarks = gt_landmarks,
+            observed_landmarks = observed_landmarks,
         )
     
     @property
@@ -88,7 +93,22 @@ class SlamRunPlotter:
         if not show:
             plt.close(fig)
 
+    def map_quality(self) -> MapQuality | None:
+        """Map landmarks against the true ones; ``None`` without ground truth."""
+        if self.gt_landmarks is None:
+            return None
+        return map_quality(
+            self.snapshots[-1].get("landmarks"), self.gt_landmarks, self.observed_landmarks
+        )
+
     def plot_final_snapshot(self, ax = None, **kwargs) -> tuple[plt.Figure, plt.Axes]:
+        quality = self.map_quality()
+        if quality is not None:
+            kwargs.setdefault(
+                "title",
+                f"MAP Estimate | landmarks: {quality.found}/{quality.observed} mapped, "
+                f"{quality.duplicates} duplicates, {quality.spurious} spurious",
+            )
         fig, ax = plot_estimate(
             ax            = ax,
             poses         = self.snapshots[-1].get("poses"),
@@ -246,6 +266,9 @@ def main() -> None:
 
     run_dir = args.run_dir
     plotter = SlamRunPlotter.from_run(run_dir)
+    quality = plotter.map_quality()
+    if quality is not None:
+        print(f"Map quality: {quality}")
     plotter.plot_all(save=True, show=args.show)
     
 

@@ -175,22 +175,17 @@ class AssociationConfig:
     """Data association parameters.
 
     Attributes:
-        method: ``"jcbb"`` for joint compatibility branch and bound, or ``"gt"``
-            for ground-truth association (simulated data only). Running with
-            ``"gt"`` is the fastest way to tell a front-end problem from a
-            back-end problem.
+        method: ``"jcbb"``, joint compatibility branch and bound (the only one).
         alpha_individual: confidence level of the individual compatibility test.
         alpha_joint: confidence level of the joint compatibility test.
-        gt_gate: nearest-landmark gate [m] used by the ``"gt"`` associator.
     """
 
     method: str = "jcbb"
     alpha_individual: float = 0.999
     alpha_joint: float = 0.9999
-    gt_gate: float = 2.0
 
     def __post_init__(self) -> None:
-        method_options = ["jcbb", "gt"]
+        method_options = ["jcbb"]
         if self.method not in method_options:
             raise ValueError(
                 f"Invalid association method {self.method}, must be one of {method_options}"
@@ -201,8 +196,6 @@ class AssociationConfig:
             )
         if not (0 < self.alpha_joint < 1):
             raise ValueError(f"alpha_joint must be in (0, 1), got {self.alpha_joint}")
-        if self.gt_gate <= 0:
-            raise ValueError(f"gt_gate must be positive, got {self.gt_gate}")
 
 
 @dataclass

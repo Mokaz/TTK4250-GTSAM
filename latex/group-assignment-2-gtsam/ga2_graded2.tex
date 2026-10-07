@@ -82,7 +82,7 @@ If you have any questions please make a post on the forum and we will try to ans
 \section*{Some background on the template code}
 The template code is a trimmed-down version of a factor graph SLAM system built on \href{https://gtsam.org}{GTSAM}, the library referred to in Sec.\ 9.5 of the book. GTSAM provides the back-end: it holds the factor graph, maintains the Bayes tree, and solves for the MAP estimate incrementally with iSAM2. Everything that GTSAM does \emph{not} do -- building the right factors, recovering a covariance from the graph, and data association -- is either yours to implement or given in the front-end.
 
-Set up the environment with \pythoninline{conda env create -f environment.yml}, then \pythoninline{conda activate ttk4250} and \pythoninline{pip install -e . --no-deps}. Run the tests with \pythoninline{pytest}. Runs are started with \pythoninline{run_sim} and \pythoninline{run_real}, and an existing run can be re-plotted with \pythoninline{plot_run <run directory>}. Do \emph{not} use \pythoninline{pip install gtsam}: PyPI publishes no Windows wheel for GTSAM, which is why the environment comes from conda-forge. See \pythoninline{docs/INSTALL.md}.
+Set up the environment with \pythoninline{conda env create -f environment.yml}, then \pythoninline{conda activate ttk4250_ga2} and \pythoninline{pip install -e . --no-deps}. Run the tests with \pythoninline{pytest}. Runs are started with \pythoninline{run_sim} and \pythoninline{run_real}, and an existing run can be re-plotted with \pythoninline{plot_run <run directory>}. Ctrl+C stops a run and still saves it up to the last completed step; add \pythoninline{--no-save-on-abort} if you would rather it just exit. Do \emph{not} use \pythoninline{pip install gtsam}: PyPI publishes no Windows wheel for GTSAM, which is why the environment comes from conda-forge. See \pythoninline{docs/INSTALL.md}.
 
 The files handed out are:
 \begin{itemize}
@@ -90,7 +90,8 @@ The files handed out are:
 	\item \pythoninline{preprocessing.py}: the odometry and lidar front-end. \pythoninline{relative_pose} and \pythoninline{preintegrate} are yours; \pythoninline{detect_trees}, which converts a raw lidar scan into range-bearing measurements, is given. \textbf{NB:} you do not need to change anything below the line in this file.
 	\item \pythoninline{factor_graph.py}: factor construction, the measurement model, covariance recovery and the innovation covariance. Most of your work is here.
 	\item \pythoninline{landmark_manager.py}: landmark birth. The \(M\) of \(N\) rule is yours; the rest is given.
-	\item \pythoninline{data_association.py}: the JCBB algorithm, and a ground-truth associator you can switch on for debugging on the simulated data set. \textbf{NB:} you do not need to do anything in this file.
+	\item \pythoninline{data_association.py}: the JCBB algorithm. \textbf{NB:} you do not need to do anything in this file.
+	\item \pythoninline{evaluation.py}: compares the finished map with the true landmarks on the simulated data set. Every simulated run reports how many true landmarks were mapped, missed, duplicated or spurious. \textbf{NB:} you do not need to do anything in this file.
 	\item \pythoninline{slam.py}: the main loop that ties all of the above together. Reading it is the fastest way to understand what happens in one time step. \textbf{NB:} you do not need to do anything in this file.
 	\item \pythoninline{loaders/}, \pythoninline{logger.py}, \pythoninline{plotter.py}, \pythoninline{plotting/}: data set adapters, run logging, and all the plotting. \textbf{NB:} you do not need to do anything in these files.
 \end{itemize}

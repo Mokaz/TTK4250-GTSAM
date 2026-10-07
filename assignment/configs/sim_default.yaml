@@ -15,14 +15,13 @@ sensor:
   range_local: 85.0              # TODO tune
   bearing_local_deg: 125.0       # TODO tune
 tentative:
-  M: 1                           # TODO tune: no clutter here, so confirm immediately
-  N: 1                           # TODO tune
-  gate: 0.2                      # TODO tune
+  M: 2                           # TODO tune: no clutter here, but one missed match must not become a landmark
+  N: 3                           # TODO tune
+  gate: 0.5                      # TODO tune
 association:
-  method: jcbb                   # "gt" runs with perfect association, for debugging
+  method: jcbb
   alpha_individual: 0.9999       # TODO tune
   alpha_joint: 0.999             # TODO tune
-  gt_gate: 2.0
 backend:
   solver: isam2                  # "batch" re-solves the whole graph every step
   relinearize_threshold: 0.1     # TODO tune (Task 4)

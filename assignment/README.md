@@ -46,6 +46,10 @@ plot_run runs/sim/example    # re-plot a finished run
 With the environment active. Add `--no-show-plots` to skip the interactive
 windows; figures are written to the run directory either way.
 
+Ctrl+C stops a run and still saves it up to the last completed step, marked as
+aborted, so you can plot it with `plot_run`. Add `--no-save-on-abort` if you
+would rather Ctrl+C just exit.
+
 Every run writes its resolved configuration, per-step diagnostics and state
 snapshots into its output directory, so a run can be re-plotted and compared
 later without re-running it.
@@ -85,11 +89,13 @@ src/graphslam/
   preprocessing.py     front-end: odometry and lidar          (a, b)
   factor_graph.py      factors, measurement model, covariance (c-f, g1)
   landmark_manager.py  landmark birth, M-of-N                 (g2)
-  data_association.py  JCBB and a ground-truth associator     given
+  data_association.py  JCBB                                   given
+  evaluation.py        map quality against the true landmarks given
   slam.py              the main loop                          given
   loaders/             dataset adapters                       given
   plotting/, plotter.py, logger.py                            given
 tests/            the graded test suite
+typings/          GTSAM type stubs, so your editor can show its signatures
 tools/            handout generation and create_handin.py
 ```
 
@@ -105,9 +111,36 @@ space at the current estimate, and so do the Jacobians from `Pose2.range` and
 hand-derived `d/d[x, y, theta]` and you are not. This also applies when you
 compute NEES — see `graphslam.utils.pose2_tangent_error`.
 
+## Editor support
+
+GTSAM is a compiled library, so on its own your editor cannot see what is
+inside it. `typings/` holds type stubs generated from the installed GTSAM, which
+VS Code (Pylance) picks up automatically when you open this folder as the
+workspace: completion, argument names and types, and every overload. For
+example, hovering `compose` shows that it optionally takes the two Jacobians
+`H1` and `H2`. Select the `ttk4250_ga2` environment as the interpreter.
+
+The stubs have signatures only, no descriptions. From Python, `help()` shows
+the same signatures:
+
+```sh
+python -c "import gtsam; help(gtsam.Pose2.compose)"
+```
+
+GTSAM's own documentation is at https://gtsam.org, and the C++ headers it wraps
+(for example `Pose2.h`) document the conventions. Where a function you implement
+needs a GTSAM call, its docstring names it.
+
 ## Debugging
 
-Set `association: method: gt` in `configs/sim_default.yaml` to run with perfect
-data association on the simulated set. Comparing that against a `jcbb` run with
-the same tuning splits your error into a front-end part and a back-end part,
-which is usually the fastest way to work out what is actually wrong.
+On the simulated set, every run ends with a map-quality line, also shown in the
+title of `final_snapshot.pdf` and printed by `plot_run`:
+
+```text
+Map quality: 78 of 78 observed true landmarks mapped, 0 missed, 0 duplicates, 0 spurious
+```
+
+Duplicates mean data association failed: a measurement of a landmark already in
+the map was not matched to it and became a new landmark. If your error is large
+and there are no duplicates, look at the models and the noise; if there are
+duplicates, look at association first.

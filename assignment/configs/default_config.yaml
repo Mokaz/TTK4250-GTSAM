@@ -24,7 +24,6 @@ association:
   method: jcbb
   alpha_individual: 0.999
   alpha_joint: 0.9999
-  gt_gate: 2.0
 backend:
   solver: isam2
   relinearize_threshold: 0.1

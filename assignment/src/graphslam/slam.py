@@ -111,6 +111,9 @@ class Backend:
     def point(self, key: int) -> np.ndarray:
         return np.asarray(self._estimate.atPoint2(key), dtype=float).reshape(2)
 
+    def contains(self, key: int) -> bool:
+        return self._estimate.exists(key)
+
     def marginal_covariance(self, key: int) -> np.ndarray:
         if self.mode == "isam2":
             return self.isam2.marginalCovariance(key)
@@ -157,6 +160,11 @@ class SlamState:
         covariances = [self.backend.marginal_covariance(k) for k in self.landmark_keys]
         return np.stack(covariances, axis=0) if covariances else np.array([])
 
+    def drop_uncommitted(self) -> None:
+        """Forget keys whose values never reached the back-end (a step cut short)."""
+        self.pose_keys = [k for k in self.pose_keys if self.backend.contains(k)]
+        self.landmark_keys = [k for k in self.landmark_keys if self.backend.contains(k)]
+
     def landmark_positions(self) -> dict[int, np.ndarray]:
         return {key: self.backend.point(key) for key in self.landmark_keys}
 
@@ -181,7 +189,15 @@ def run_slam(
     num_steps: int | None,
     show_plots: bool = False,
     save_plots: bool = True,
+    save_on_abort: bool = True,
 ) -> None:
+    """Run SLAM over ``dataset`` and write the run directory.
+
+    With ``save_on_abort`` (the default), Ctrl+C stops the run but still saves
+    everything up to the last completed step, marked ``"aborted": true`` in
+    ``metadata.json``, so it can be plotted like any other run. Without it,
+    Ctrl+C exits immediately and nothing is saved.
+    """
     logger = SlamLogger(output_dir, config.logging)
 
     num_steps = dataset.max_steps if num_steps is None else min(dataset.max_steps, num_steps)
@@ -198,7 +214,7 @@ def run_slam(
     )
 
     manager = get_tentative_landmark_manager(config)
-    associate = get_associator(config, dataset)
+    associate = get_associator(config)
     bearing_range_noise = fg.bearing_range_noise_model(config)
 
     diagnostics_steps: list[StepDiagnostics] = []
@@ -214,144 +230,155 @@ def run_slam(
 
     t_run_start = time.perf_counter()
 
-    for k, meas in tqdm(
-        enumerate(dataset.iterate_slam(config, num_steps)), total=num_steps, desc="SLAM"
-    ):
-        diagnostics = StepDiagnostics()
-        t_step = time.perf_counter()
+    aborted = False
+    try:
+        for k, meas in tqdm(
+            enumerate(dataset.iterate_slam(config, num_steps)), total=num_steps, desc="SLAM"
+        ):
+            diagnostics = StepDiagnostics()
+            t_step = time.perf_counter()
 
-        pose_key = X(k)
+            pose_key = X(k)
 
-        # ======= 1. Odometry: grow the graph and solve =======
-        if meas.relative_pose is not None:
-            key_previous = X(k - 1)
-            slam.pose_keys.append(pose_key)
+            # ======= 1. Odometry: grow the graph and solve =======
+            if meas.relative_pose is not None:
+                key_previous = X(k - 1)
+                slam.pose_keys.append(pose_key)
 
-            predicted_pose = fg.predict_pose(slam.backend.pose(key_previous), meas.relative_pose)
-            slam.new_values.insert(pose_key, predicted_pose)
+                predicted_pose = fg.predict_pose(slam.backend.pose(key_previous), meas.relative_pose)
+                slam.new_values.insert(pose_key, predicted_pose)
 
-            fg.add_odometry_factor(
-                slam.new_factors,
-                key_previous,
-                pose_key,
-                meas.relative_pose,
-                meas.relative_pose_cov,
+                fg.add_odometry_factor(
+                    slam.new_factors,
+                    key_previous,
+                    pose_key,
+                    meas.relative_pose,
+                    meas.relative_pose_cov,
+                )
+
+                t0 = time.perf_counter()
+                slam.update_and_clear()
+                diagnostics.add_time("duration_optimization", time.perf_counter() - t0)
+
+            pose = slam.backend.pose(pose_key)
+
+            # ======= 2. What should we be seeing from here? =======
+            t0 = time.perf_counter()
+            local_map = fg.extract_local_map(
+                pose, slam.landmark_keys, slam.landmark_positions(), config
             )
+            diagnostics.duration_local_landmark_extraction = time.perf_counter() - t0
+
+            # ======= 3. Covariance recovery and innovation covariance =======
+            if len(local_map) > 0:
+                t0 = time.perf_counter()
+                P = slam.backend.joint_covariance(pose_key, local_map)
+                diagnostics.duration_covariance_extraction = time.perf_counter() - t0
+
+                S = fg.innovation_covariance(
+                    local_map.jacobians_pose,
+                    local_map.jacobians_landmark,
+                    P,
+                    config.noise.range_bearing_cov_matrix,
+                )
+            else:
+                P = np.zeros((3, 3))
+                S = np.zeros((0, 0))
+
+            # ======= 4. Associate =======
+            measurements = meas.measurements
+
+            t0 = time.perf_counter()
+            association = associate(measurements, local_map, S)
+            diagnostics.duration_association = time.perf_counter() - t0
+
+            is_associated = association >= 0
+            for measurement, local_index in zip(
+                measurements[is_associated], association[is_associated]
+            ):
+                fg.add_landmark_factor(
+                    slam.new_factors,
+                    pose_key,
+                    local_map.keys[local_index],
+                    measurement,
+                    bearing_range_noise,
+                )
+
+            # ======= 5. Landmark birth =======
+            unassociated = measurements[~is_associated]
+            tentative_positions = np.asarray(
+                [fg.inverse_measurement(pose, z) for z in unassociated], dtype=float
+            ).reshape(-1, 2)
+
+            confirmed = manager.add_tentative_landmarks(
+                current_step=k,
+                unassociated_measurements=unassociated,
+                new_tentative_landmarks=tentative_positions,
+            )
+
+            for landmark in confirmed:
+                landmark_key = L(len(slam.landmark_keys))
+                slam.landmark_keys.append(landmark_key)
+                slam.new_values.insert(landmark_key, gtsam.Point2(*landmark.position))
+
+                # Every observation that supported this landmark becomes a factor,
+                # retroactively connecting it to the poses it was seen from. This is
+                # something a filter simply cannot do: the graph keeps the past
+                # around, so evidence can be added to it after the fact.
+                for observation in landmark.supporting_observations:
+                    fg.add_landmark_factor(
+                        slam.new_factors,
+                        X(observation.step),
+                        landmark_key,
+                        observation.measurement,
+                        bearing_range_noise,
+                    )
 
             t0 = time.perf_counter()
             slam.update_and_clear()
             diagnostics.add_time("duration_optimization", time.perf_counter() - t0)
 
-        pose = slam.backend.pose(pose_key)
+            # ======= Logging =======
+            diagnostics.duration_step = time.perf_counter() - t_step
+            diagnostics.scan_step = k
+            diagnostics.scan_time = meas.scan_time
+            diagnostics.num_landmarks = len(slam.landmark_keys)
+            diagnostics.num_local_landmarks = len(local_map)
+            diagnostics.num_associated_measurement = int(np.sum(is_associated))
+            diagnostics.num_unassociated_measurement = int(np.sum(~is_associated))
+            diagnostics_steps.append(diagnostics)
 
-        # ======= 2. What should we be seeing from here? =======
-        t0 = time.perf_counter()
-        local_map = fg.extract_local_map(
-            pose, slam.landmark_keys, slam.landmark_positions(), config
-        )
-        diagnostics.duration_local_landmark_extraction = time.perf_counter() - t0
-
-        # ======= 3. Covariance recovery and innovation covariance =======
-        if len(local_map) > 0:
-            t0 = time.perf_counter()
-            P = slam.backend.joint_covariance(pose_key, local_map)
-            diagnostics.duration_covariance_extraction = time.perf_counter() - t0
-
-            S = fg.innovation_covariance(
-                local_map.jacobians_pose,
-                local_map.jacobians_landmark,
-                P,
-                config.noise.range_bearing_cov_matrix,
-            )
-        else:
-            P = np.zeros((3, 3))
-            S = np.zeros((0, 0))
-
-        # ======= 4. Associate =======
-        measurements = meas.measurements
-
-        t0 = time.perf_counter()
-        association = associate(measurements, local_map, S, k)
-        diagnostics.duration_association = time.perf_counter() - t0
-
-        is_associated = association >= 0
-        for measurement, local_index in zip(
-            measurements[is_associated], association[is_associated]
-        ):
-            fg.add_landmark_factor(
-                slam.new_factors,
-                pose_key,
-                local_map.keys[local_index],
-                measurement,
-                bearing_range_noise,
-            )
-
-        # ======= 5. Landmark birth =======
-        unassociated = measurements[~is_associated]
-        tentative_positions = np.asarray(
-            [fg.inverse_measurement(pose, z) for z in unassociated], dtype=float
-        ).reshape(-1, 2)
-
-        confirmed = manager.add_tentative_landmarks(
-            current_step=k,
-            unassociated_measurements=unassociated,
-            new_tentative_landmarks=tentative_positions,
-        )
-
-        for landmark in confirmed:
-            landmark_key = L(len(slam.landmark_keys))
-            slam.landmark_keys.append(landmark_key)
-            slam.new_values.insert(landmark_key, gtsam.Point2(*landmark.position))
-
-            if hasattr(associate, "associator"):
-                associate.associator.register_landmark(landmark_key, landmark.position)
-
-            # Every observation that supported this landmark becomes a factor,
-            # retroactively connecting it to the poses it was seen from. This is
-            # something a filter simply cannot do: the graph keeps the past
-            # around, so evidence can be added to it after the fact.
-            for observation in landmark.supporting_observations:
-                fg.add_landmark_factor(
-                    slam.new_factors,
-                    X(observation.step),
-                    landmark_key,
-                    observation.measurement,
-                    bearing_range_noise,
+            if logger.should_save_association_diagnostics(k):
+                logger.save_association_diagnostics(
+                    AssociationDiagnostics(
+                        scan_step=k,
+                        scan_time=meas.scan_time,
+                        pose_index=k,
+                        pose=pose2_to_array(pose),
+                        measurements=measurements,
+                        predicted_measurements=local_map.predicted_measurements,
+                        association=association,
+                        local_landmarks=local_map.positions,
+                        local_landmark_keys=np.asarray(local_map.keys, dtype=np.int64),
+                        prior_joint_covariance=P,
+                        innovation_covariance=S,
+                    )
                 )
 
-        t0 = time.perf_counter()
-        slam.update_and_clear()
-        diagnostics.add_time("duration_optimization", time.perf_counter() - t0)
-
-        # ======= Logging =======
-        diagnostics.duration_step = time.perf_counter() - t_step
-        diagnostics.scan_step = k
-        diagnostics.scan_time = meas.scan_time
-        diagnostics.num_landmarks = len(slam.landmark_keys)
-        diagnostics.num_local_landmarks = len(local_map)
-        diagnostics.num_associated_measurement = int(np.sum(is_associated))
-        diagnostics.num_unassociated_measurement = int(np.sum(~is_associated))
-        diagnostics_steps.append(diagnostics)
-
-        if logger.should_save_association_diagnostics(k):
-            logger.save_association_diagnostics(
-                AssociationDiagnostics(
-                    scan_step=k,
-                    scan_time=meas.scan_time,
-                    pose_index=k,
-                    pose=pose2_to_array(pose),
-                    measurements=measurements,
-                    predicted_measurements=local_map.predicted_measurements,
-                    association=association,
-                    local_landmarks=local_map.positions,
-                    local_landmark_keys=np.asarray(local_map.keys, dtype=np.int64),
-                    prior_joint_covariance=P,
-                    innovation_covariance=S,
-                )
-            )
-
-        if logger.should_save_snapshot(k):
-            logger.save_snapshot(k, slam.get_snapshot())
+            if logger.should_save_snapshot(k):
+                logger.save_snapshot(k, slam.get_snapshot())
+    except KeyboardInterrupt:
+        # Ctrl+C: keep what has been computed, so the run can still be plotted.
+        if not save_on_abort:
+            raise
+        aborted = True
+        slam.drop_uncommitted()
+        # One pose per completed step, so the poses line up with the step logs.
+        slam.pose_keys = slam.pose_keys[: max(len(diagnostics_steps), 1)]
+        print(
+            f"\nInterrupted after {len(diagnostics_steps)} of {num_steps} steps. Saving the run so far "
+            "(final snapshot and covariances may take a moment; press Ctrl+C again to give up)."
+        )
 
     total_time = time.perf_counter() - t_run_start
 
@@ -362,7 +389,7 @@ def run_slam(
 
     logger.save_snapshot(final_diagnostics.scan_step, slam.get_snapshot(), final=True)
     logger.save_steps_diagnostics(diagnostics_steps)
-    logger.save_metadata(final_diagnostics, total_time, dataset=dataset.name)
+    logger.save_metadata(final_diagnostics, total_time, dataset=dataset.name, aborted=aborted)
 
     if save_plots or show_plots:
         from graphslam.plotter import SlamRunPlotter

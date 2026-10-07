@@ -20,10 +20,9 @@ tentative:
   N: 4                           # TODO tune
   gate: 0.2                      # TODO tune
 association:
-  method: jcbb                   # no ground truth here, so "gt" is not available
+  method: jcbb
   alpha_individual: 0.9999       # TODO tune
   alpha_joint: 0.9999            # TODO tune
-  gt_gate: 2.0
 backend:
   solver: isam2                  # do not use "batch" on this data set
   relinearize_threshold: 0.1     # TODO tune (Task 4)

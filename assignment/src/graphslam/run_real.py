@@ -15,6 +15,7 @@ def run_real(
     num_steps: int | None,
     show_plots: bool = False,
     save_plots: bool = True,
+    save_on_abort: bool = True,
 ) -> None:
     dataset = VictoriaParkLoader(initial_heading_deg=config.victoria_park.initial_heading_deg)
     return run_slam(
@@ -24,6 +25,7 @@ def run_real(
         num_steps=num_steps,
         show_plots=show_plots,
         save_plots=save_plots,
+        save_on_abort=save_on_abort,
     )
 
 
@@ -34,6 +36,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=7300)
     parser.add_argument("--no-show-plots", action="store_true", help="Do not display plots after the run.")
     parser.add_argument("--no-save-plots", action="store_true", help="Do not save plots to the run directory.")
+    parser.add_argument(
+        "--no-save-on-abort",
+        action="store_true",
+        help="On Ctrl+C, exit without saving. By default an interrupted run is saved up to the last completed step.",
+    )
     return parser.parse_args()
 
 
@@ -51,6 +58,7 @@ def main() -> None:
         num_steps=args.steps,
         show_plots=not args.no_show_plots,
         save_plots=not args.no_save_plots,
+        save_on_abort=not args.no_save_on_abort,
     )
 
 

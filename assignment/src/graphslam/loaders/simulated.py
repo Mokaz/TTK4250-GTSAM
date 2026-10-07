@@ -36,6 +36,31 @@ class SimulatedDataLoader:
     def initial_pose(self) -> np.ndarray:
         return self.poses_gt[0]
 
+    def observed_landmarks(self, num_steps: int | None = None) -> np.ndarray:
+        """Indices of the true landmarks measured at least once in the first steps.
+
+        Each measurement is attributed to the true landmark it is closest to in
+        measurement space, seen from the true pose. The scales are the data
+        set's own noise (range 0.05 m, bearing 1 deg), not your tuning.
+        """
+        num_steps = self.max_steps if num_steps is None else min(num_steps, self.max_steps)
+        seen: set[int] = set()
+        for k in range(num_steps):
+            z = np.asarray(self.measurements[k], dtype=float).reshape(-1, 2)
+            if len(z) == 0:
+                continue
+            x, y, psi = self.poses_gt[k]
+            dx, dy = self.landmarks_gt[:, 0] - x, self.landmarks_gt[:, 1] - y
+            predicted_range = np.hypot(dx, dy)
+            predicted_bearing = np.arctan2(dy, dx) - psi
+            for measured_range, measured_bearing in z:
+                bearing_error = np.angle(np.exp(1j * (measured_bearing - predicted_bearing)))
+                cost = ((measured_range - predicted_range) / 0.05) ** 2 + (
+                    bearing_error / np.deg2rad(1.0)
+                ) ** 2
+                seen.add(int(np.argmin(cost)))
+        return np.array(sorted(seen), dtype=int)
+
     def iterate_slam(
         self,
         config: SlamConfig,

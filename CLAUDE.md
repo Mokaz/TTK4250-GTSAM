@@ -20,6 +20,12 @@ latex/env/            LaTeX preamble
 `python tools/make_handout.py --out ../handout`; the LaTeX code snippets come
 from the same pass with `--latex`.
 
+`assignment/typings/` holds generated GTSAM type stubs (GTSAM is a compiled
+module with `py.typed` and no `.pyi`, so editors otherwise see nothing in it).
+Regenerate with `tools/make_gtsam_stubs.py` whenever the GTSAM pin changes; it
+is copied into the handout. `make_handout.py` empties `handout/` instead of
+deleting it, because Windows cannot delete a folder an editor or shell has open.
+
 `handout/` is gitignored on purpose: it is fully generated, it is ~12 MB
 because the generator copies `data/` into it, and a committed copy can drift
 from `assignment/`. Zip it at release time instead of tracking it.
@@ -104,12 +110,12 @@ guards it now; keep any new covariance route covered by it.
 
 ## Testing
 
-82 tests, ~8 s. The suite is also the grading instrument, so a test's failure
+87 tests, ~8 s. The suite is also the grading instrument, so a test's failure
 message is student-facing: write them that way.
 
 Run the handout through the suite after any change to the solution blocks — the
-expected result is that only the tests touching given code pass, currently 27
-of 82. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
+expected result is that only the tests touching given code pass, currently 30
+of 87. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
 check that no graded work hides behind a given-code test, not a scoring floor.
 
 `tests/test_plotting.py` exists because every other test runs with
@@ -127,6 +133,18 @@ back: fixed 35 s of step time (optimization 11.2 / covariance 11.0 /
 association 7.3 / local-map extraction 4.7), pre-fix 40 s. Per-step median
 17.5 ms, 95th percentile 33 ms.
 
+Full run (6 Oct, quiet machine; the data set has 7247 scan steps, so
+`--steps 7300` is simply "all of it"). Back to back with a 20.6 s 2000-step run:
+
+| Tuning | Run time | Landmarks | RMS vs GNSS | GNSS ANIS (1 m) | Landmark ANIS |
+|---|---|---|---|---|---|
+| `real_default.yaml` | 146 s | 288 | 1.79 m | 1.36 | 0.26 |
+| odometry 0.1 m / 0.3° | 291 s | 1282 | 218 m | ~2e4 | 0.49 |
+
+Steps 5000–7000 cost about 3x the earlier ones (revisits, bigger cliques):
+per-step median 13.7 ms, 95th percentile 61 ms, max 88 ms. The lowered-noise
+run is the one Task 3 asks for; it diverges completely and takes twice as long.
+
 ## Known gaps and open decisions
 
 - **Tuning intent for `real_default.yaml` (decided 2 Oct).** The shipped values
@@ -143,8 +161,11 @@ association 7.3 / local-map extraction 4.7), pre-fix 40 s. Per-step median
 - `jointMarginalSupportCliqueCount` is not in GTSAM 4.3, so
   `num_support_cliques` is always zero. The plots that used it are skipped
   unless a patched build fills it in.
-- Full 7300-step Victoria Park run not yet timed; the `--steps` figure in the
-  assignment text is provisional.
+- No `--steps` limit is needed for Task 3 (see Measured). Task 3 has a "Plan
+  your runs" paragraph: explore with `--steps 2000`, report only full runs
+  (the runtime plot's expensive regime starts after scan 5000). Its numbers
+  (2.5 min, ~140 landmarks at 2000, 20 s) come from the Measured section;
+  update both together.
 - `Car.a` / `Car.b` (lidar offset) parsed but unused. Backlogged (2 Oct) as a
   possible optional exercise; the system works without it.
 - Reference solution not yet solved once from the student side and timed.
@@ -157,6 +178,32 @@ association 7.3 / local-map extraction 4.7), pre-fix 40 s. Per-step median
   on pairings. The book (Sec. 7.3.2) says "at least as many". The book's
   version gave identical results on 2000 Victoria Park steps and 48% more
   association time. Kept, with a comment saying all of this (6 Oct).
+
+- **Ground-truth associator removed (7 Oct).** The fork had added
+  `association.method: gt` (the thesis only had a stub); it was broken (637
+  landmarks instead of 78, a fixed 2 m gate against 1.35 m of bearing noise at
+  range). Replaced by `graphslam/evaluation.py`: after every simulated run, map
+  landmarks are matched one-to-one (Hungarian, 3 m) to the true landmarks the
+  run observed, and found / missed / duplicates / spurious are printed, shown in
+  the final-snapshot title and by `plot_run`. Task 2's front-end/back-end
+  question now uses it. Baseline: 76 of 78, 0 duplicates.
+- **JCBB blow-up (found 7 Oct).** Duplicate landmarks give each measurement
+  2-3.6 compatible candidates and JCBB visits roughly their product; runs go
+  from 10 s to 5 min, or hours. `sim_default.yaml`'s M 1, N 1 is the
+  amplifier. **Changed 7 Oct: `sim_default.yaml` now ships M 2, N 3, gate
+  0.5.** Baseline: 76 of 78 mapped, 0 duplicates, 0.39 m RMSE, ANIS 0.65, ANEES
+  0.68, 10 s. True R: 14 s instead of 285 s (13 duplicates instead of 83). Still
+  slow: true R plus halved odometry (53 s), everything at a fifth (5 min, fails),
+  `range_local` 40 (hangs) -- those need a JCBB work limit if anything.
+  The thesis code on GTSAM 4.3 shows the same blow-up with R halved (214
+  landmarks, 345 s), but not with the true R (80, 9 s), because its scrambled
+  S is wide enough that JCBB never rejects a true pairing. With a correct S,
+  rejections happen at the 1 - alpha rate, and M 1, N 1 turns each into a
+  permanent duplicate. M 1, N 1 is only safe while S is conservative.
+  Ctrl+C now saves the run so far, marked `aborted` in metadata.json;
+  `--no-save-on-abort` on run_sim/run_real turns that off (7 Oct).
+- Simulated data's true noise: range sd 0.05 m, bearing sd 0.99 deg. The
+  shipped `sigma_range` 0.2 is why Task 2's landmark ANIS is 0.65.
 
 ## Working style for this repo
 

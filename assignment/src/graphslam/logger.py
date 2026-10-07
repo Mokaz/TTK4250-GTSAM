@@ -179,6 +179,7 @@ class SlamLogger:
         dataset: str,
         algebraic_connectivity: float | None = None,
         verbose: bool = True,
+        aborted: bool = False,
     ) -> None:
 
         metadata = {
@@ -191,6 +192,8 @@ class SlamLogger:
 
         if algebraic_connectivity is not None:
             metadata["algebraic_connectivity"] = algebraic_connectivity
+        if aborted:
+            metadata["aborted"] = True
 
         metadata_path = self.run_dir / "metadata.json"
         metadata_path.write_text(json.dumps(metadata, indent=2))
@@ -206,6 +209,8 @@ class SlamLogger:
             ]
             if algebraic_connectivity is not None:
                 lines.append(f"  Connectivity: {algebraic_connectivity:.4f}")
+            if aborted:
+                lines.append("  Aborted     : yes (interrupted with Ctrl+C)")
             print("\n".join(lines))
 
     # ------------------------------------------------------------------

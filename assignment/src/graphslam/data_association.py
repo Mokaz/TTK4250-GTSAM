@@ -1,4 +1,4 @@
-"""Data association: JCBB and a ground-truth associator.
+"""Data association: JCBB.
 
 Nothing in this file is graded -- it is handed to you the same way JCBB was
 handed to you in the EKF-SLAM assignment. It is worth reading anyway, because
@@ -12,7 +12,6 @@ The branch and bound search is described in Sec. 7.3.1 and 7.3.2 of the book.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from functools import lru_cache
 
 import numpy as np
@@ -181,107 +180,18 @@ def num_associations(array: np.ndarray) -> int:
     return int(np.count_nonzero(array > -1))
 
 
-# ---------------------------------------------------------------------------
-# Ground-truth association  (simulated data only)
-# ---------------------------------------------------------------------------
+def get_associator(config: SlamConfig):
+    """Return a callable ``(measurements, local_map, S) -> association``."""
+    if config.association.method != "jcbb":
+        raise ValueError(f"Unknown association method: {config.association.method}")
 
-
-@dataclass
-class GroundTruthAssociator:
-    """Associate using the true poses and landmarks of the simulated data set.
-
-    This is a debugging instrument, not an algorithm. Running the same tuning
-    twice, once with ``method: jcbb`` and once with ``method: gt``, splits your
-    error into the part the front-end is responsible for and the part the
-    back-end is responsible for (Sec. 9.1). If the two runs look the same, your
-    association is fine and the problem is in the models or the noise; if the
-    ``gt`` run is dramatically better, chase the associations.
-    """
-
-    landmarks_gt: np.ndarray
-    poses_gt: np.ndarray
-    gate: float = 2.0
-
-    def __post_init__(self) -> None:
-        self.landmarks_gt = np.asarray(self.landmarks_gt, dtype=float).reshape(-1, 2)
-        self.poses_gt = np.asarray(self.poses_gt, dtype=float).reshape(-1, 3)
-        # Map key -> index into landmarks_gt, or -1 for a spurious landmark.
-        self._key_to_truth: dict[int, int] = {}
-
-    def register_landmark(self, key: int, position: np.ndarray) -> None:
-        """Record which true landmark a newly created map landmark corresponds to."""
-        distances = np.linalg.norm(self.landmarks_gt - np.asarray(position), axis=1)
-        nearest = int(np.argmin(distances))
-        self._key_to_truth[key] = nearest if distances[nearest] < self.gate else -1
-
-    def associate(
-        self,
-        step: int,
-        measurements: np.ndarray,
-        local_keys: list[int],
-    ) -> np.ndarray:
-        """Associate measurements at ``step`` against the local map."""
-        num_measurements = measurements.shape[0]
-        association = np.full(num_measurements, -1, dtype=int)
-
-        if num_measurements == 0 or len(local_keys) == 0:
-            return association
-
-        truth_to_local = {
-            self._key_to_truth.get(key, -1): index
-            for index, key in enumerate(local_keys)
-            if self._key_to_truth.get(key, -1) >= 0
-        }
-
-        x, y, psi = self.poses_gt[min(step, len(self.poses_gt) - 1)]
-
-        for i, (measured_range, measured_bearing) in enumerate(measurements):
-            # Back-project with the true pose.
-            angle = psi + measured_bearing
-            world = np.array(
-                [x + measured_range * np.cos(angle), y + measured_range * np.sin(angle)]
-            )
-
-            distances = np.linalg.norm(self.landmarks_gt - world, axis=1)
-            nearest = int(np.argmin(distances))
-            if distances[nearest] < self.gate and nearest in truth_to_local:
-                association[i] = truth_to_local[nearest]
-
-        return association
-
-
-def get_associator(config: SlamConfig, dataset=None):
-    """Return a callable ``(measurements, local_map, S, step) -> association``."""
-    if config.association.method == "jcbb":
-
-        def associate(measurements, local_map, S, step):  # noqa: ARG001 - uniform signature
-            return JCBB_association(
-                measurements,
-                local_map.predicted_measurements,
-                S,
-                config.association.alpha_individual,
-                config.association.alpha_joint,
-            )
-
-        return associate
-
-    if config.association.method == "gt":
-        if dataset is None or not hasattr(dataset, "landmarks_gt"):
-            raise ValueError(
-                "association.method 'gt' requires a data set with ground truth "
-                "(the simulated data set)."
-            )
-
-        associator = GroundTruthAssociator(
-            landmarks_gt=dataset.landmarks_gt,
-            poses_gt=dataset.poses_gt,
-            gate=config.association.gt_gate,
+    def associate(measurements, local_map, S):
+        return JCBB_association(
+            measurements,
+            local_map.predicted_measurements,
+            S,
+            config.association.alpha_individual,
+            config.association.alpha_joint,
         )
 
-        def associate(measurements, local_map, S, step):  # noqa: ARG001 - uniform signature
-            return associator.associate(step, measurements, local_map.keys)
-
-        associate.associator = associator  # so slam.py can register new landmarks
-        return associate
-
-    raise ValueError(f"Unknown association method: {config.association.method}")
+    return associate
