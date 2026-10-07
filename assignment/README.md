@@ -85,6 +85,7 @@ logger and the plotting are given.
 environment.yml   the conda environment; this is the supported setup
 configs/          run configurations; everything marked "TODO tune" is yours
 data/             simulated and Victoria Park data sets
+docs/             INSTALL.md (setup) and GTSAM.md (the GTSAM calls you need)
 src/graphslam/
   preprocessing.py     front-end: odometry and lidar          (a, b)
   factor_graph.py      factors, measurement model, covariance (c-f, g1)
@@ -127,9 +128,10 @@ the same signatures:
 python -c "import gtsam; help(gtsam.Pose2.compose)"
 ```
 
-GTSAM's own documentation is at https://gtsam.org, and the C++ headers it wraps
-(for example `Pose2.h`) document the conventions. Where a function you implement
-needs a GTSAM call, its docstring names it.
+**`docs/GTSAM.md` lists every GTSAM call Task 1 needs, with what each one
+means.** Start there; the assignment text names the calls each part needs.
+GTSAM's own documentation (https://gtsam.org) is written for C++ and rarely
+needed.
 
 ## Debugging
 

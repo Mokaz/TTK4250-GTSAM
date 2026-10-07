@@ -3,7 +3,7 @@
 Where EKF-SLAM had a \pythoninline{predict} and an \pythoninline{update}, a factor graph SLAM system has three jobs: build the graph, recover a covariance from it, and use that covariance to decide which measurement belongs to which landmark.
 The back-end (iSAM2, through GTSAM) does the optimization for you; everything below is the part it does \emph{not} do.
 
-All functions are marked with \pythoninline{# TODO} in the code. Run the tests with \pythoninline{pytest}: how many of them pass is part of how we evaluate your submission as a whole.
+All functions are marked with \pythoninline{# TODO} in the code. Run the tests with \pythoninline{pytest}: how many of them pass is part of how we evaluate your submission as a whole. The GTSAM calls you need are listed in \pythoninline{docs/GTSAM.md}, and your editor shows their signatures.
 
 Two conventions are worth fixing in your head before you start, because both produce systems that run happily while being wrong:
 \begin{itemize}
@@ -25,7 +25,7 @@ Two conventions are worth fixing in your head before you start, because both pro
     Held constant over the interval, this twist integrates \emph{exactly} to \(\Delta T = \mathrm{Exp}(\xi\,\Delta t)\), which follows a circular arc.
 
     \begin{longhint}
-        Do not Euler-integrate into \(\begin{bmatrix} v_b\Delta t & 0 & \omega\Delta t\end{bmatrix}\) and build a \pythoninline{Pose2} from that. The difference is second order in \(\omega \Delta t\): invisible in one step, and clearly visible after a few thousand of them. The exponential map is covered in Sec.\ 6.2.3; \pythoninline{gtsam.Pose2.Expmap} implements it.
+        Do not Euler-integrate into \(\begin{bmatrix} v_b\Delta t & 0 & \omega\Delta t\end{bmatrix}\) and build a \pythoninline{Pose2} from that. The difference is second order in \(\omega \Delta t\): invisible in one step, and clearly visible after a few thousand of them. The exponential map is covered in Sec.\ 6.2.3; \pythoninline{gtsam.Pose2.Expmap} implements it, taking \(\xi\Delta t\) as a numpy array. The vehicle geometry is the \pythoninline{car} argument: \(H\) is \pythoninline{car.H} and \(L\) is \pythoninline{car.L}.
     \end{longhint}
     \begin{solution} \input{py/gtsam/a/solu.tex} \end{solution}
 
@@ -42,7 +42,7 @@ Two conventions are worth fixing in your head before you start, because both pro
     where \(H_1\) and \(H_2\) are the Jacobians of \pythoninline{compose} with respect to its first and second argument. This is ordinary linear covariance propagation; it just happens on a manifold, so the Jacobians are those of the group operation rather than of a vector sum.
 
     \begin{longhint}
-        \pythoninline{gtsam.Pose2.compose} fills in both Jacobians for you if you pass two preallocated \pythoninline{np.zeros((3, 3), order="F")} arrays.
+        Start the recursion from ``no motion, known exactly'': the identity pose \pythoninline{gtsam.Pose2()} and a zero \(3\times3\) covariance. That is also the right answer for an empty list of increments. \pythoninline{gtsam.Pose2.compose} fills in both Jacobians for you if you pass two preallocated \pythoninline{np.zeros((3, 3), order="F")} arrays.
     \end{longhint}
     \begin{solution} \input{py/gtsam/b/solu.tex} \end{solution}
 
@@ -50,16 +50,29 @@ Two conventions are worth fixing in your head before you start, because both pro
     \breakans
     \part Build the graph. Each factor you add is literally one term of the negative log posterior (9.4), and therefore one term of the cost function (9.6) that the back-end minimizes.
     \begin{subparts}
-        \subpart Implement \input{py/gtsam/c1/def.tex}, which composes a relative pose increment onto the previous pose. The odometry factor penalises \(x_k \ominus x_{k-1}\) against the measured increment (9.5), so this composition is the natural initial guess for \(x_k\) -- and a factor graph needs an initial guess, because (9.13) is a Gauss-Newton step and not a closed-form filter update.
+        \subpart Implement \input{py/gtsam/c1/def.tex}, which returns the predicted pose
+        \[
+            \hat{x}_k = \hat{x}_{k-1} \oplus u_k :
+        \]
+        the previous pose estimate compounded with the odometry increment \(u_k\), which is expressed in the body frame of \(x_{k-1}\). In words: rotate the increment's translation by the previous heading and add it to the previous position, and add the two headings. The compounding \(\oplus\) is the inverse of the \(\ominus\) in (9.5); for a \pythoninline{gtsam.Pose2} it is \pythoninline{compose}.
+
+        The prediction is only the starting value for the new variable \(x_k\): (9.13) is solved iteratively, so every variable needs one. It adds no information to the graph; the odometry factor in the next part does that.
         \begin{solution} \input{py/gtsam/c1/solu.tex} \end{solution}
 
         \subpart Implement \input{py/gtsam/c2/def.tex}, adding the middle term of (9.6) as a \pythoninline{BetweenFactorPose2}.
         \begin{longhint}
-            Use \pythoninline{gtsam.noiseModel.Gaussian.Covariance} and not \pythoninline{.Sigmas}: the covariance you preintegrated in (b) is not diagonal, and discarding its off-diagonal terms is an easy way to end up over-confident and inconsistent.
+            The factor is constructed as
+            \begin{center}\pythoninline{gtsam.BetweenFactorPose2(key_previous, key_current, measured, noise_model)}\end{center}
+            and \pythoninline{graph.add(factor)} adds it to the graph. Use \pythoninline{gtsam.noiseModel.Gaussian.Covariance} and not \pythoninline{.Sigmas}: the covariance you preintegrated in (b) is not diagonal, and discarding its off-diagonal terms is an easy way to end up over-confident and inconsistent.
         \end{longhint}
         \begin{solution} \input{py/gtsam/c2/solu.tex} \end{solution}
 
         \subpart Implement \input{py/gtsam/c3/def.tex}, adding the last term of (9.6) as a \pythoninline{BearingRangeFactor2D}. Mind the argument order.
+        \begin{longhint}
+            The factor is constructed as
+            \begin{center}\pythoninline{gtsam.BearingRangeFactor2D(pose_key, landmark_key, bearing, range, noise_model)}\end{center}
+            with the bearing \emph{first}, as a \pythoninline{gtsam.Rot2} (\pythoninline{gtsam.Rot2(angle)}), and the range as a float. A plain float bearing raises a \pythoninline{TypeError}. The noise model you are handed is already ordered [bearing, range] to match.
+        \end{longhint}
         \begin{solution} \input{py/gtsam/c3/solu.tex} \end{solution}
     \end{subparts}
 
@@ -107,7 +120,7 @@ Two conventions are worth fixing in your head before you start, because both pro
         Compare this with \pythoninline{add_landmarks} in the EKF-SLAM assignment, where you also had to propagate \(G_x^j P G_x^{jT} + G_z^j R G_z^{jT}\) by hand. Here you do not: once the landmark is connected by factors, the graph works its covariance out for itself. That is a direct consequence of (9.2) -- the posterior was always a product of factors, and the EKF's covariance bookkeeping was only ever a way of summarising it.
         \begin{solution} \input{py/gtsam/g1/solu.tex} \end{solution}
 
-        \subpart Implement \input{py/gtsam/g2/def.tex}, the \(M\) of \(N\) confirmation rule: promote a tentative landmark once it has been seen in at least \(M\) distinct time steps inside a sliding window of the last \(N\), inclusive at both ends. This is the same track initiation logic used in target tracking.
+        \subpart Implement \input{py/gtsam/g2/def.tex}, the \(M\) of \(N\) confirmation rule: promote a tentative landmark once it has been seen in at least \(M\) distinct time steps inside a sliding window of the last \(N\), inclusive at both ends. This is the same track initiation logic used in target tracking. Count \emph{time steps}, not observations: here they coincide, because association is one-to-one, but a front-end that allowed two measurements of one landmark in a single scan would otherwise confirm on one scan's worth of evidence -- exactly the clutter burst the rule exists to reject.
         \begin{solution} \input{py/gtsam/g2/solu.tex} \end{solution}
     \end{subparts}
 

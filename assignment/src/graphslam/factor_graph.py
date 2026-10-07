@@ -1,28 +1,7 @@
 """Factor graph construction, measurement prediction and covariance recovery.
 
-This is the heart of the assignment. Everything marked ``TODO`` below is graded
-by the test suite.
-
-Where EKF-SLAM had a ``predict`` and an ``update``, a factor graph SLAM system
-has three jobs instead:
-
-1. **Build the graph.** Every factor you add is literally one term of the
-   negative log posterior (9.6) in the book. The back-end (iSAM2) then finds the
-   MAP estimate by Gauss-Newton on the whole trajectory and map at once.
-2. **Recover a covariance.** The EKF handed you ``P`` for free. A factor graph
-   stores information, not covariance, so the joint marginal over the current
-   pose and the nearby landmarks must be *recovered* from the Bayes tree before
-   anything can be gated. This is Sec. 9.4 of the book, and it is the single
-   biggest practical difference between the two approaches.
-3. **Decide what is what.** Data association happens outside the back-end
-   (Sec. 9.1, front-end vs. back-end), using the covariance from step 2.
-
-A note on Jacobians and frames that will save you an afternoon: the covariance
-GTSAM gives you for a ``Pose2`` lives in the *tangent space* at the current
-estimate, not in raw ``[x, y, theta]`` coordinates. The measurement Jacobians
-returned by ``Pose2.range`` and ``Pose2.bearing`` use the same convention, so as
-long as you use GTSAM's Jacobians together with GTSAM's covariance you are
-consistent. Mixing them with a hand-derived ``d/d[x,y,theta]`` Jacobian is not.
+The functions marked ``TODO`` are Task 1 (c) to (g1); the assignment text
+explains each one. The rest of this file is given.
 """
 
 from __future__ import annotations
@@ -80,11 +59,7 @@ def bearing_range_noise_model(config: SlamConfig) -> gtsam.noiseModel.Base:
 
 
 def predict_pose(previous_pose: gtsam.Pose2, relative_pose: gtsam.Pose2) -> gtsam.Pose2:
-    """Compose a relative pose increment onto the previous pose.
-
-    This is the inverse of the ``(-)`` operator in (9.5): the odometry factor
-    penalises ``x_k (-) x_{k-1}`` against the measured increment, so the natural
-    initial guess for ``x_k`` is ``x_{k-1}`` composed with that increment.
+    """Initial guess for x_k: the previous pose composed with the increment. Task 1 (c1).
 
     Parameters
     ----------
@@ -96,7 +71,7 @@ def predict_pose(previous_pose: gtsam.Pose2, relative_pose: gtsam.Pose2) -> gtsa
     Returns
     -------
     gtsam.Pose2
-        The predicted pose x_k, used as the initial guess handed to the solver.
+        The predicted pose x_k.
     """
     # TODO(c1): compose the relative pose onto the previous pose.
     # BEGIN SOLUTION
@@ -111,7 +86,7 @@ def add_odometry_factor(
     relative_pose: gtsam.Pose2,
     relative_pose_cov: np.ndarray,
 ) -> None:
-    """Add the odometry term of (9.6) to the graph.
+    """Add the odometry factor between x_{k-1} and x_k to the graph. Task 1 (c2).
 
     Parameters
     ----------
@@ -123,13 +98,6 @@ def add_odometry_factor(
         Measured (preintegrated) increment.
     relative_pose_cov : np.ndarray, shape=(3, 3)
         Covariance of that increment, in the tangent space of ``relative_pose``.
-
-    Notes
-    -----
-    Use ``gtsam.noiseModel.Gaussian.Covariance`` and not ``.Sigmas``: the
-    preintegrated covariance from Task 1 (b) is *not* diagonal, and throwing
-    away its off-diagonal terms is one of the easier ways to end up with an
-    over-confident, inconsistent system.
     """
     # TODO(c2): add a BetweenFactorPose2 with a full-covariance Gaussian noise model.
     # BEGIN SOLUTION
@@ -152,16 +120,17 @@ def add_landmark_factor(
     measurement: np.ndarray,
     noise_model: gtsam.noiseModel.Base,
 ) -> None:
-    """Add the landmark measurement term of (9.6) to the graph.
+    """Add one landmark measurement factor to the graph. Task 1 (c3).
 
     Parameters
     ----------
     graph : gtsam.NonlinearFactorGraph
+        Graph of new factors, to be handed to the solver.
     pose_key, landmark_key : int
         Keys of the pose the measurement was taken from and of the landmark it
         was associated to.
     measurement : np.ndarray, shape=(2,)
-        The measurement **ordered [range, bearing]**.
+        The measurement, **ordered [range, bearing]**.
     noise_model : gtsam.noiseModel.Base
         From :func:`bearing_range_noise_model`, ordered [bearing, range].
     """
@@ -189,10 +158,7 @@ def predict_measurement(
     pose: gtsam.Pose2,
     landmark: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Predict the range-bearing measurement of one landmark, with Jacobians.
-
-    This is ``h(x_k, m_j)`` from (9.6)/(9.7), plus the two blocks of the
-    Jacobian ``J`` in (9.8) that belong to this pose and this landmark.
+    """Predicted range-bearing measurement of one landmark, with Jacobians. Task 1 (d).
 
     Parameters
     ----------
@@ -209,16 +175,6 @@ def predict_measurement(
         d z / d x_k, in the tangent space at ``pose``.
     H_landmark : np.ndarray, shape=(2, 2)
         d z / d m_j.
-
-    Notes
-    -----
-    ``gtsam.Pose2.range`` and ``gtsam.Pose2.bearing`` both take two optional
-    Jacobian arguments which they fill in for you. They must be preallocated
-    with the right shape *and* in Fortran order, e.g.::
-
-        H = np.zeros((1, 3), order="F")
-
-    ``bearing`` returns a ``gtsam.Rot2``; take ``.theta()`` to get the angle.
     """
     # TODO(d): predict [range, bearing] and stack the two rows of each Jacobian.
     # BEGIN SOLUTION
@@ -241,19 +197,14 @@ def predict_measurement(
 
 
 def inverse_measurement(pose: gtsam.Pose2, measurement: np.ndarray) -> np.ndarray:
-    """Back-project a range-bearing measurement to a world-frame position.
-
-    This is ``h^{-1}(z, x)``: the graph analogue of ``add_landmarks`` in the
-    EKF-SLAM assignment. Unlike the EKF version you do *not* have to propagate a
-    covariance -- the graph works that out for itself once the landmark is
-    connected by factors, which is one of the nicer consequences of (9.2).
+    """World-frame landmark position from one range-bearing measurement. Task 1 (g1).
 
     Parameters
     ----------
     pose : gtsam.Pose2
         Pose the measurement was taken from.
     measurement : np.ndarray, shape=(2,)
-        Measurement **ordered [range, bearing]**.
+        The measurement, **ordered [range, bearing]**.
 
     Returns
     -------
@@ -279,22 +230,13 @@ def reorder_joint_covariance(
     keys: list[int],
     dims: list[int],
 ) -> np.ndarray:
-    """Permute a GTSAM joint marginal covariance into the order *you* asked for.
-
-    :func:`query_joint_covariance` returns the blocks of a joint marginal
-    ordered by **ascending key value**, not in the order the keys were
-    requested. Because
-    ``gtsam.symbol_shorthand.L`` encodes the character ``'l'`` (108) and ``X``
-    encodes ``'x'`` (120), every landmark key sorts *before* every pose key --
-    so a query for ``[X(k), L(3), L(7)]`` comes back ordered
-    ``[L(3), L(7), X(k)]``. Stack a measurement Jacobian against that without
-    noticing and you get an innovation covariance that is subtly, silently
-    wrong.
+    """Reorder a joint covariance from ascending key order to the order of ``keys``. Task 1 (e).
 
     Parameters
     ----------
     covariance : np.ndarray, shape=(D, D)
-        Joint covariance as returned by GTSAM, in ascending-key order.
+        Joint covariance as returned by :func:`query_joint_covariance`, with its
+        blocks in ascending key order.
     keys : list[int]
         The keys in the order you want them, e.g. ``[X(k), L(3), L(7)]``.
     dims : list[int]
@@ -303,7 +245,7 @@ def reorder_joint_covariance(
     Returns
     -------
     np.ndarray, shape=(D, D)
-        The same covariance with its blocks reordered to match ``keys``.
+        The same covariance with its blocks in the order of ``keys``.
     """
     # TODO(e): build the index permutation and apply it to both rows and columns.
     # BEGIN SOLUTION
@@ -346,14 +288,7 @@ def innovation_covariance(
     joint_covariance: np.ndarray,
     measurement_cov: np.ndarray,
 ) -> np.ndarray:
-    """Assemble ``S = H P H^T + R`` for the whole local map at once.
-
-    ``P`` is the joint marginal over ``[x_k, m_{j1}, ..., m_{jn}]`` recovered in
-    Task 1 (e), so it has shape ``(3 + 2n, 3 + 2n)`` and, crucially, it contains
-    the **cross-covariances between landmarks**. Those cross terms are the whole
-    reason JCBB can be joint rather than a sequence of independent gates: they
-    are what makes a set of individually plausible associations collectively
-    implausible.
+    """Innovation covariance ``S = H P H^T + R`` for the whole local map. Task 1 (f).
 
     Parameters
     ----------
@@ -363,7 +298,7 @@ def innovation_covariance(
     jacobians_landmark : list of np.ndarray, each shape=(2, 2)
         ``H_landmark`` from :func:`predict_measurement`, same order.
     joint_covariance : np.ndarray, shape=(3 + 2n, 3 + 2n)
-        Joint marginal ``P``, pose block first.
+        Joint marginal ``P`` over ``[x_k, m_1, ..., m_n]``, pose block first.
     measurement_cov : np.ndarray, shape=(2, 2)
         Single-measurement ``R``, ordered [range, bearing].
 
@@ -371,13 +306,6 @@ def innovation_covariance(
     -------
     np.ndarray, shape=(2n, 2n)
         The innovation covariance ``S``.
-
-    Notes
-    -----
-    ``H`` is dense in its three leftmost columns (every measurement depends on
-    the pose) and block diagonal elsewhere (measurement ``i`` only depends on
-    landmark ``i``) -- the same structure as the EKF-SLAM measurement Jacobian,
-    for the same reason.
     """
     # TODO(f): build the stacked H, build the block-diagonal R, and form S.
     # BEGIN SOLUTION

@@ -1,14 +1,7 @@
-"""Landmark birth: deciding when a repeated detection becomes a map landmark.
+"""Landmark birth: when a repeated detection becomes a map landmark (M of N).
 
-A measurement that JCBB could not associate is either a landmark you have not
-seen before, or clutter. Putting every one of them straight into the graph
-fills the map with spurious landmarks that then attract wrong associations;
-never putting them in means the map never grows. The classic compromise is the
-same ``M`` of ``N`` rule used for track initiation in target tracking: hold the
-detection as *tentative*, and promote it only once it has been seen in at least
-``M`` distinct time steps inside a sliding window of ``N``.
-
-Only :meth:`TentativeLandmark.is_confirmed` is graded.
+Only :meth:`TentativeLandmark.is_confirmed` is graded: Task 1 (g2). The rest of
+this file is given.
 """
 
 from __future__ import annotations
@@ -82,11 +75,7 @@ class TentativeLandmark:
         self.position = (1.0 - alpha) * self.position + alpha * new_position
 
     def is_confirmed(self, current_step: int, M: int, N: int) -> bool:
-        """Has this landmark been seen in at least ``M`` of the last ``N`` steps?
-
-        The window is ``[current_step - N + 1, current_step]``, inclusive at both
-        ends, so ``M = N = 1`` means "confirm on the first sighting" -- which is
-        the right setting for the simulated data set, where there is no clutter.
+        """Whether this landmark was seen in at least ``M`` of the last ``N`` steps. Task 1 (g2).
 
         Parameters
         ----------
@@ -95,20 +84,13 @@ class TentativeLandmark:
         M : int
             Number of distinct time steps the landmark must have been seen in.
         N : int
-            Length of the sliding window, in time steps.
+            Length of the window ``[current_step - N + 1, current_step]``,
+            inclusive at both ends.
 
         Returns
         -------
         bool
             Whether the landmark should be promoted into the graph.
-
-        Notes
-        -----
-        Count *time steps*, not observations. They are the same thing here
-        because association is one-to-one, but a front-end that allowed two
-        measurements of one landmark in a single scan would confirm on a single
-        scan's worth of evidence if you counted observations -- exactly the
-        clutter burst the M-of-N rule exists to reject.
         """
         # TODO(g2): count supporting observations inside the window and compare to M.
         # BEGIN SOLUTION

@@ -6,9 +6,7 @@ import gtsam
 import numpy as np
 import pytest
 
-from graphslam.preprocessing import Car, preintegrate, relative_pose
-
-CAR = Car()
+from graphslam.preprocessing import CAR, Car, preintegrate, relative_pose
 
 
 def _integrate_unicycle(velocity: float, yaw_rate: float, dt: float) -> np.ndarray:
@@ -52,6 +50,23 @@ def test_relative_pose_applies_the_encoder_offset_correction() -> None:
     pose = relative_pose(vel_encoder, steer, dt)
 
     assert pose.theta() == pytest.approx(expected_yaw, rel=1e-9)
+
+
+def test_relative_pose_uses_the_car_it_is_given() -> None:
+    """The geometry must come from the ``car`` argument, not be hard-coded.
+
+    With the encoder on the centre line (H = 0) there is no offset correction,
+    so the yaw rate is simply v tan(steer) / L.
+    """
+    vel_encoder, steer, dt = 3.0, 0.20, 0.4
+    centred = Car(L=2.0, H=0.0)
+
+    pose = relative_pose(vel_encoder, steer, dt, car=centred)
+
+    expected_yaw = vel_encoder * np.tan(steer) / centred.L * dt
+    assert pose.theta() == pytest.approx(expected_yaw, rel=1e-9), (
+        "relative_pose ignored its car argument: use car.H and car.L"
+    )
 
 
 def test_relative_pose_follows_an_arc_not_a_straight_line() -> None:

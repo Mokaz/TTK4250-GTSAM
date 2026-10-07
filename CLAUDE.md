@@ -26,6 +26,12 @@ Regenerate with `tools/make_gtsam_stubs.py` whenever the GTSAM pin changes; it
 is copied into the handout. `make_handout.py` empties `handout/` instead of
 deleting it, because Windows cannot delete a folder an editor or shell has open.
 
+`assignment/docs/GTSAM.md` is the student-facing reference for every GTSAM call
+Task 1 needs; every fact in it was checked against GTSAM 4.3. If a task starts
+needing a new GTSAM call, add it there. Note: in 4.3, Jacobian out-arguments
+need float64 and the exact shape (else `TypeError`); C order works as well as
+`order="F"`, so docs say F is conventional, not required.
+
 `handout/` is gitignored on purpose: it is fully generated, it is ~12 MB
 because the generator copies `data/` into it, and a committed copy can drift
 from `assignment/`. Zip it at release time instead of tracking it.
@@ -110,12 +116,12 @@ guards it now; keep any new covariance route covered by it.
 
 ## Testing
 
-87 tests, ~8 s. The suite is also the grading instrument, so a test's failure
+88 tests, ~8 s. The suite is also the grading instrument, so a test's failure
 message is student-facing: write them that way.
 
 Run the handout through the suite after any change to the solution blocks — the
 expected result is that only the tests touching given code pass, currently 30
-of 87. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
+of 88. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
 check that no graded work hides behind a given-code test, not a scoring floor.
 
 `tests/test_plotting.py` exists because every other test runs with
@@ -206,6 +212,13 @@ run is the one Task 3 asks for; it diverges completely and takes twice as long.
   shipped `sigma_range` 0.2 is why Task 2's landmark ANIS is 0.65.
 
 ## Working style for this repo
+
+Explanations and hints for the graded functions live in the task text
+(`ga2_task01_implement.tex`), not in their docstrings (decided 7 Oct, after
+three stale docstring claims turned up in one day). A graded function's
+docstring is a one-line summary naming its task, plus Parameters and Returns
+(types, shapes, units, the [range, bearing] ordering). New hints go into the
+LaTeX; GTSAM API facts go into `docs/GTSAM.md`.
 
 Do not change code when asked only to review it. Do not touch the original
 EKF-SLAM LaTeX files. When a design decision affects the students' experience

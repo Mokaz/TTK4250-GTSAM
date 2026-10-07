@@ -29,36 +29,17 @@ class Car:
     b: float = 0.5  # laser distance to the left of centre
 
 
+# The Victoria Park vehicle. Its geometry never changes, so it is built once.
+CAR = Car()
+
+
 # ---------------------------------------------------------------------------
 # Task 1 (a): the kinematic bicycle model as a relative pose
 # ---------------------------------------------------------------------------
 
 
-def relative_pose(vel_encoder: float, steer: float, dt: float) -> gtsam.Pose2:
-    """Turn one wheel-encoder reading into a relative pose increment.
-
-    The Victoria Park vehicle gives a forward speed measured at the left rear
-    wheel and a steering angle. The kinematic bicycle model converts these into
-    a body twist, which is then integrated over ``dt``.
-
-    Two steps, both worth thinking about:
-
-    1. **Encoder frame to body frame.** The encoder sits on the left rear wheel,
-       a distance ``H`` off the centre line, so during a turn it travels along a
-       different arc than the centre of the rear axle. With ``L`` the axle
-       distance, the centre-of-axle speed is
-
-           v_body = v_encoder / (1 - (H/L) tan(steer))
-
-       and the yaw rate is ``omega = (v_body / L) tan(steer)``.
-
-    2. **Twist to pose.** The body twist is ``xi = [v_body, 0, omega]``, held
-       constant over the interval. Integrating it exactly gives
-       ``Delta_T = Exp(xi * dt)``, which follows a circular arc. Do **not**
-       Euler-integrate into ``[v*dt, 0, omega*dt]`` and build a ``Pose2`` from
-       that: the difference is second order in ``omega*dt``, small per step and
-       clearly visible after a few thousand of them. The Lie group exponential
-       is covered in Sec. 6.2.3 of the book; ``gtsam.Pose2.Expmap`` implements it.
+def relative_pose(vel_encoder: float, steer: float, dt: float, car: Car = CAR) -> gtsam.Pose2:
+    """Relative pose increment from one wheel-encoder reading. Task 1 (a).
 
     Parameters
     ----------
@@ -68,6 +49,9 @@ def relative_pose(vel_encoder: float, steer: float, dt: float) -> gtsam.Pose2:
         Wheel steering angle [rad].
     dt : float
         Duration of the interval [s].
+    car : Car
+        Vehicle geometry: ``car.H`` (centre line to encoder) and ``car.L``
+        (axle distance) [m]. Defaults to the Victoria Park vehicle.
 
     Returns
     -------
@@ -76,8 +60,6 @@ def relative_pose(vel_encoder: float, steer: float, dt: float) -> gtsam.Pose2:
     """
     # TODO(a): build the body twist and integrate it over dt with the exponential map.
     # BEGIN SOLUTION
-    car = Car()
-
     tangent_steer = np.tan(steer)
     velocity_body = vel_encoder / (1.0 - (car.H / car.L) * tangent_steer)
     yaw_rate = (velocity_body / car.L) * tangent_steer
@@ -97,31 +79,14 @@ def preintegrate(
     poses: list[gtsam.Pose2],
     covariances: list[np.ndarray],
 ) -> tuple[gtsam.Pose2, np.ndarray]:
-    """Compound a sequence of relative poses into a single one, with covariance.
-
-    Wheel odometry arrives far faster than lidar scans. Rather than putting a
-    pose in the graph for every encoder tick, the increments between two scans
-    are compounded into one relative pose and one covariance, and enter the
-    graph as a single ``BetweenFactorPose2``. This is preintegration, mentioned
-    in Sec. 9.1 -- the same idea that is used for IMU data, in its simplest form.
-
-    The mean is just repeated composition. The covariance is the interesting
-    part: composition is nonlinear, so each increment's covariance has to be
-    pushed through the Jacobians of the composition,
-
-        Sigma <- H1 Sigma H1^T + H2 Sigma_i H2^T
-
-    where ``H1`` and ``H2`` are the Jacobians of ``compose`` with respect to its
-    first and second argument. This is ordinary linear covariance propagation --
-    it just happens on a manifold, so the Jacobians are the ones of the group
-    operation rather than of a vector sum.
+    """Compound relative pose increments into one, with its covariance. Task 1 (b).
 
     Parameters
     ----------
     poses : list of gtsam.Pose2
         Relative increments, in time order.
     covariances : list of np.ndarray, each shape=(3, 3)
-        Covariance of each increment.
+        Covariance of each increment, in its tangent space.
 
     Returns
     -------
@@ -129,17 +94,6 @@ def preintegrate(
         The compounded relative pose.
     np.ndarray, shape=(3, 3)
         Its covariance.
-
-    Notes
-    -----
-    ``gtsam.Pose2.compose`` takes two optional Jacobian arguments, which must be
-    preallocated in Fortran order::
-
-        H1 = np.zeros((3, 3), order="F")
-        H2 = np.zeros((3, 3), order="F")
-        composed = a.compose(b, H1, H2)
-
-    An empty input list should give the identity pose and a zero covariance.
     """
     # TODO(b): compound the increments and propagate the covariance.
     # BEGIN SOLUTION
