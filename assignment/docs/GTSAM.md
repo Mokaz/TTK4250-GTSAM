@@ -68,8 +68,7 @@ covariance through them.
 ## Keys
 
 Every variable in the graph has an integer key. `X(k)` is pose number `k` and
-`L(j)` is landmark number `j`. A key encodes its letter, so every `L` key is
-smaller than every `X` key; Task 1 (e) is about exactly that.
+`L(j)` is landmark number `j`.
 
 ## Building the graph
 
@@ -78,6 +77,19 @@ smaller than every `X` key; Task 1 (e) is about exactly that.
 | `graph.add(factor)` | Add a factor to a `gtsam.NonlinearFactorGraph`. |
 | `gtsam.BetweenFactorPose2(key1, key2, measured, noise_model)` | A relative-pose measurement `measured` (a `Pose2`) between two pose variables: the odometry term of (9.6). |
 | `gtsam.BearingRangeFactor2D(pose_key, point_key, bearing, range, noise_model)` | A landmark measurement: the last term of (9.6). The bearing is a `gtsam.Rot2`, the range a float. Note the order: **bearing first**, while this code base stores measurements as `[range, bearing]`. |
+
+## Covariances
+
+A factor graph stores information, so covariances are recovered from it on
+request (Sec. 9.4). The given back-end does the asking; you get the result.
+
+| Call | Meaning |
+|---|---|
+| `isam2.marginalCovariance(key)` | Covariance of one variable. |
+| `isam2.jointMarginalCovariance(keys)` | Joint covariance of several variables, from iSAM2's Bayes tree. Returns a `gtsam.JointMarginal`. `keys` is a list of keys. |
+| `gtsam.Marginals(graph, values).jointMarginalCovariance(keys)` | The same, computed from scratch over the whole graph (the batch route). Also returns a `gtsam.JointMarginal`. |
+| `joint_marginal.at(key_i, key_j)` | The block of the joint covariance between two variables: 3x3 for two poses, 3x2 for a pose and a landmark, 2x2 for two landmarks. |
+| `joint_marginal.fullMatrix()` | The whole matrix at once. Prefer `.at()`: it names the variables, so it cannot mix up their order. |
 
 ## Noise models
 

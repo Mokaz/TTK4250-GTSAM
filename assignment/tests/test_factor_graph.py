@@ -1,5 +1,5 @@
-"""Task 1 (c) graph construction, (d) measurement model, (e) covariance
-reordering, (f) innovation covariance and (g1) inverse measurement."""
+"""Task 1 (c) graph construction, (d) measurement model, (e) joint
+covariance, (f) innovation covariance and (g1) inverse measurement."""
 
 from __future__ import annotations
 
@@ -15,12 +15,11 @@ from graphslam.factor_graph import (
     add_odometry_factor,
     bearing_range_noise_model,
     LocalMap,
+    assemble_joint_covariance,
     innovation_covariance,
     inverse_measurement,
-    local_joint_covariance,
     predict_measurement,
     predict_pose,
-    reorder_joint_covariance,
 )
 from graphslam.utils import ssa
 
@@ -272,72 +271,54 @@ def test_inverse_measurement_inverts_predict_measurement(pose_values, landmark) 
 
 
 # ---------------------------------------------------------------------------
-# (e) reorder_joint_covariance
+# (e) assemble_joint_covariance
 # ---------------------------------------------------------------------------
 
 
-def _labelled_block_matrix(dims, order):
-    """Block matrix whose (i, j) block is filled with the constant ``10*a + b``.
+class _LabelledJointMarginal:
+    """Stands in for a gtsam.JointMarginal: block (a, b) is filled with 10*a + b.
 
-    ``order`` lists the block labels in the order they appear in the matrix, so
-    the same logical covariance can be laid out in any block order and the
-    blocks stay identifiable.
+    Each key is labelled 1, 2, 3, ... so every block, and which way round it is,
+    can be identified in the assembled matrix.
     """
-    total = int(np.sum([dims[label] for label in order]))
-    offsets = np.concatenate([[0], np.cumsum([dims[label] for label in order])]).astype(int)
 
-    M = np.zeros((total, total))
-    for i, label_i in enumerate(order):
-        for j, label_j in enumerate(order):
-            value = 10 * min(label_i, label_j) + max(label_i, label_j)
-            M[offsets[i] : offsets[i + 1], offsets[j] : offsets[j + 1]] = value
-    return M
+    def __init__(self, labels: dict[int, int], dims: dict[int, int]) -> None:
+        self.labels, self.dims = labels, dims
+
+    def at(self, key_i: int, key_j: int) -> np.ndarray:
+        value = 10 * self.labels[key_i] + self.labels[key_j]
+        return np.full((self.dims[key_i], self.dims[key_j]), float(value))
 
 
-def test_reorder_joint_covariance_moves_the_pose_block_to_the_front() -> None:
-    """GTSAM sorts by key value, and every L key sorts before every X key."""
-    keys = [X(7), L(3), L(1)]
-    dims_by_label = {1: 3, 2: 2, 3: 2}  # label 1 is the pose block
-
-    # What we asked for: pose, L(3), L(1).
-    wanted = _labelled_block_matrix(dims_by_label, order=[1, 2, 3])
-
-    # What GTSAM hands back: ascending key, i.e. L(1), L(3), X(7).
-    as_returned = _labelled_block_matrix(dims_by_label, order=[3, 2, 1])
-
-    reordered = reorder_joint_covariance(as_returned, keys, [3, 2, 2])
-
-    np.testing.assert_allclose(reordered, wanted)
-    # The pose block really is the leading 3x3.
-    np.testing.assert_allclose(reordered[0:3, 0:3], np.full((3, 3), 11.0))
+def _labelled_marginal():
+    labels = {X(7): 1, L(3): 2, L(1): 3}
+    dims = {X(7): 3, L(3): 2, L(1): 2}
+    return _LabelledJointMarginal(labels, dims)
 
 
-def test_reorder_joint_covariance_is_the_identity_when_already_sorted() -> None:
-    keys = [L(1), L(2), L(5)]
-    dims = [2, 2, 2]
-    covariance = np.arange(36.0).reshape(6, 6)
-    covariance = covariance + covariance.T
+def test_assemble_joint_covariance_puts_the_pose_block_first() -> None:
+    P = assemble_joint_covariance(_labelled_marginal(), [X(7), L(3), L(1)])
 
-    np.testing.assert_allclose(reorder_joint_covariance(covariance, keys, dims), covariance)
+    assert P.shape == (7, 7)
+    np.testing.assert_allclose(P[0:3, 0:3], 11.0, err_msg="the pose block must come first")
 
 
-def test_reorder_joint_covariance_preserves_symmetry_and_trace() -> None:
-    keys = [X(4), L(9), L(2), L(11)]
-    dims = [3, 2, 2, 2]
+def test_assemble_joint_covariance_follows_the_order_of_keys() -> None:
+    """Block (i, j) is the covariance between keys[i] and keys[j], whatever the order."""
+    P = assemble_joint_covariance(_labelled_marginal(), [X(7), L(1), L(3)])
 
-    rng = np.random.default_rng(0)
-    A = rng.normal(size=(9, 9))
-    covariance = A @ A.T
-
-    reordered = reorder_joint_covariance(covariance, keys, dims)
-
-    np.testing.assert_allclose(reordered, reordered.T, atol=1e-12)
-    assert np.trace(reordered) == pytest.approx(np.trace(covariance))
+    np.testing.assert_allclose(P[3:5, 3:5], 33.0)  # L(1) with itself
+    np.testing.assert_allclose(P[5:7, 5:7], 22.0)  # L(3) with itself
+    np.testing.assert_allclose(P[0:3, 3:5], 13.0)  # pose with L(1)
+    np.testing.assert_allclose(P[3:5, 5:7], 32.0)  # L(1) with L(3)
 
 
-def test_reorder_joint_covariance_rejects_mismatched_shapes() -> None:
-    with pytest.raises(ValueError):
-        reorder_joint_covariance(np.eye(5), [X(0), L(0)], [3, 3])
+def test_assemble_joint_covariance_keeps_the_landmark_cross_blocks() -> None:
+    """The landmark-landmark blocks are what makes JCBB joint; they must not be zero."""
+    P = assemble_joint_covariance(_labelled_marginal(), [X(7), L(3), L(1)])
+
+    np.testing.assert_allclose(P[3:5, 5:7], 23.0, err_msg="missing landmark-landmark cross block")
+    np.testing.assert_allclose(P[5:7, 3:5], 32.0, err_msg="missing landmark-landmark cross block")
 
 
 def _small_isam2_problem() -> tuple[gtsam.ISAM2, gtsam.NonlinearFactorGraph, gtsam.Values]:
@@ -382,42 +363,65 @@ def _small_isam2_problem() -> tuple[gtsam.ISAM2, gtsam.NonlinearFactorGraph, gts
     return isam2, graph, isam2.calculateEstimate()
 
 
-@pytest.mark.parametrize("method", ["bayes_tree", "marginals", "elimination"])
-def test_local_joint_covariance_matches_gtsam_block_by_block(method: str) -> None:
-    """End to end through the real GTSAM queries, for every covariance method.
+@pytest.mark.parametrize("route", ["bayes_tree", "marginals"])
+def test_assemble_joint_covariance_matches_gtsam_block_by_block(route: str) -> None:
+    """With a real gtsam.JointMarginal from either GTSAM route.
 
-    ``local_joint_covariance`` (given) queries GTSAM and hands the result to
-    your ``reorder_joint_covariance``. Every block of what comes out must match
-    the block GTSAM itself reports for that pair of keys.
+    Every block of the assembled P must match the block GTSAM reports for that
+    pair of keys, with the landmarks deliberately asked for out of key order.
     """
     isam2, graph, estimate = _small_isam2_problem()
-
-    config = SlamConfig()
-    config.backend.covariance_method = method
-    local_map = LocalMap(keys=[L(2), L(0), L(1)])  # deliberately not in key order
-
-    joint = local_joint_covariance(isam2, X(3), local_map, config)
-
     keys = [X(3), L(2), L(0), L(1)]
+    query = gtsam.KeyVector(keys)
+
+    if route == "bayes_tree":
+        joint_marginal = isam2.jointMarginalCovariance(query)
+    else:
+        joint_marginal = gtsam.Marginals(graph, estimate).jointMarginalCovariance(query)
+
+    P = assemble_joint_covariance(joint_marginal, keys)
+
+    reference = gtsam.Marginals(graph, estimate).jointMarginalCovariance(gtsam.KeyVector(sorted(keys)))
     dims = [3, 2, 2, 2]
     offsets = np.concatenate([[0], np.cumsum(dims)]).astype(int)
-    reference = gtsam.Marginals(graph, estimate).jointMarginalCovariance(gtsam.KeyVector(keys))
-
-    assert joint.shape == (9, 9)
+    assert P.shape == (9, 9)
     for i, key_i in enumerate(keys):
         for j, key_j in enumerate(keys):
-            block = joint[offsets[i] : offsets[i + 1], offsets[j] : offsets[j + 1]]
             np.testing.assert_allclose(
-                block,
+                P[offsets[i] : offsets[i + 1], offsets[j] : offsets[j + 1]],
                 reference.at(key_i, key_j),
                 atol=1e-8,
                 err_msg=(
-                    f"covariance_method={method!r}: block ({gtsam.Symbol(key_i).string()}, "
-                    f"{gtsam.Symbol(key_j).string()}) does not match GTSAM's own marginal. "
-                    "The rows and columns are permuted wrongly: the pose block must come first, "
-                    "then the landmarks in the order of local_map.keys."
+                    f"{route}: block ({gtsam.Symbol(key_i).string()}, "
+                    f"{gtsam.Symbol(key_j).string()}) does not match GTSAM. The pose "
+                    "block must come first, then the landmarks in the order of keys."
                 ),
             )
+
+
+@pytest.mark.parametrize(("solver", "method"), [("isam2", "bayes_tree"), ("isam2", "marginals"), ("batch", "bayes_tree")])
+def test_the_back_end_returns_P_with_the_pose_block_first(solver: str, method: str) -> None:
+    """The given back-end, end to end: GTSAM's query plus your assembly.
+
+    Guards against a covariance whose blocks are in a different order than the
+    Jacobians of (f): a misordered P still gives a valid-looking S, just a wrong
+    one, and nothing crashes.
+    """
+    from graphslam.slam import Backend
+
+    _, graph, values = _small_isam2_problem()
+    config = SlamConfig()
+    config.backend.solver = solver
+    config.backend.covariance_method = method
+    backend = Backend(config)
+    backend.update(graph, values)
+
+    local_map = LocalMap(keys=[L(2), L(0), L(1)])
+    P = backend.joint_covariance(X(3), local_map)
+
+    np.testing.assert_allclose(P[0:3, 0:3], backend.marginal_covariance(X(3)), atol=1e-8)
+    np.testing.assert_allclose(P[3:5, 3:5], backend.marginal_covariance(L(2)), atol=1e-8)
+    np.testing.assert_allclose(P[7:9, 7:9], backend.marginal_covariance(L(1)), atol=1e-8)
 
 
 # ---------------------------------------------------------------------------

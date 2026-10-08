@@ -88,10 +88,10 @@ assignment is tested against, is the environment file.
 
 ## Why GTSAM 4.3 specifically
 
-`graphslam.factor_graph.query_joint_covariance` calls
+The back-end recovers the joint covariance of the local map every step with
 
 ```python
-isam2.jointMarginalCovariance(gtsam.KeyVector(keys)).fullMatrix()
+isam2.jointMarginalCovariance(gtsam.KeyVector(keys))
 ```
 
 and `ISAM2.jointMarginalCovariance` first reached a stable release in 4.3. On
@@ -105,24 +105,19 @@ those variables are in the tree rather than the size of the map, which is what
 makes a joint covariance per time step affordable — see Sec. 9.4 and 9.5 of the
 book.
 
-## Three ways to recover the covariance
+## Two ways to recover the covariance
 
-`backend.covariance_method` selects between them. All three compute the same
-matrix.
+`backend.covariance_method` selects between them. Both compute the same matrix.
 
 | Value | How | Cost |
 | --- | --- | --- |
-| `bayes_tree` | incremental query on the Bayes tree | roughly flat in map size |
-| `marginals` | batch `Marginals` rebuilt every call | grows with the whole graph |
-| `elimination` | linearize, marginalize, invert the Hessian | slowest, most explicit |
+| `bayes_tree` | `isam2.jointMarginalCovariance`, incremental, on the Bayes tree | roughly flat in map size |
+| `marginals` | `gtsam.Marginals` rebuilt from the whole graph every call | grows with the whole graph |
 
-`bayes_tree` is the default and the one to use. The other two are there so you
-can time them against it — compare the logged `duration_covariance_extraction`
-on Victoria Park and you have the argument of Sec. 9.3.2–9.5 as a single plot.
-
-`elimination` linearizes at iSAM2's last relinearization point rather than at
-the current estimate, so with a large `relinearize_threshold` it will disagree
-slightly with the other two. That is expected, and interesting.
+`bayes_tree` is the default and the one to use. `marginals` is there so you can
+time the two against each other — compare the logged
+`duration_covariance_extraction` on Victoria Park and you have the argument of
+Sec. 9.3.2–9.5 as a single plot.
 
 ## If you already have Anaconda: read this
 

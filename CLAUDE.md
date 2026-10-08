@@ -16,6 +16,22 @@ latex/group-assignment-2-gtsam/
 latex/env/            LaTeX preamble
 ```
 
+After any change to a `ga2_*.tex` file or to the LaTeX snippets, rebuild the
+PDF in place so `latex/group-assignment-2-gtsam/build/ga2_graded2.pdf` is
+current (the folder is gitignored; Martin reads that file):
+
+```sh
+cd latex/group-assignment-2-gtsam
+latexmk -lualatex -shell-escape -interaction=nonstopmode -outdir=build ga2_graded2.tex
+```
+
+It needs LuaLaTeX (fontspec) and `-shell-escape` (minted). Check the log for
+`!` errors, and look at the rendered page when a change adds long inline code:
+`\pythoninline` does not wrap, so a long call runs past the margin.
+If the build fails with "Serious error that appeared not to generate a log
+file" or a locked `.data.minted` file, Martin's editor is building into the same
+`build/` at the same time: wait for its `latexmk` to finish and rerun.
+
 `assignment/` is the source of truth. `handout/` is regenerated from it with
 `python tools/make_handout.py --out ../handout`; the LaTeX code snippets come
 from the same pass with `--latex`.
@@ -87,7 +103,7 @@ Each is wrapped in `# TODO(<task>):` + `# BEGIN SOLUTION` / `# END SOLUTION`.
 | c2 | `add_odometry_factor` | `factor_graph.py` | (9.4), (9.6) |
 | c3 | `add_landmark_factor` | `factor_graph.py` | (9.6) |
 | d | `predict_measurement` | `factor_graph.py` | (9.7), (9.8) |
-| e | `reorder_joint_covariance` | `factor_graph.py` | Sec. 9.4.1, (9.27)–(9.28) |
+| e | `assemble_joint_covariance` | `factor_graph.py` | Sec. 9.4.1, (9.27)–(9.28) |
 | f | `innovation_covariance` | `factor_graph.py` | **(9.26)** |
 | g1 | `inverse_measurement` | `factor_graph.py` | (9.2) |
 | g2 | `TentativeLandmark.is_confirmed` | `landmark_manager.py` | track initiation |
@@ -105,23 +121,26 @@ estimate. Used together they are consistent; mixing either with a hand-derived
 `d/d[x, y, theta]` is not. Same applies to NEES — see
 `graphslam.utils.pose2_tangent_error`.
 
-**Block order.** GTSAM 4.3's `bayes_tree` and `marginals` joint-covariance
-queries return blocks in the order the keys were requested; the `elimination`
-route returns them in key order (every `L` key sorts before every `X` key).
-`query_joint_covariance` therefore always queries with sorted keys, which is
-what task (e) assumes. Until 1 Oct 2026 it did not, and the default path
-silently scrambled P: 14 m from GNSS instead of 1.5 m on Victoria Park, with
-every test green. `test_local_joint_covariance_matches_gtsam_block_by_block`
-guards it now; keep any new covariance route covered by it.
+**Block order.** A joint covariance must have its blocks in the same order as
+the Jacobians it meets in (f). Task (e) assembles P from GTSAM's
+`JointMarginal.at(key_i, key_j)`, which names the variables and so cannot be
+misordered (decided 8 Oct). Do not lay P out from `.fullMatrix()`: in 4.3 it
+follows the request order, older GTSAM documented it as key-sorted, and the
+thesis code assumed the latter. On 1 Oct that mismatch silently scrambled P
+(14 m from GNSS instead of 1.5 m on Victoria Park, every test green). The back-end
+calls GTSAM directly (`isam2.jointMarginalCovariance`, or `gtsam.Marginals` for
+`covariance_method: marginals` and the batch solver); there is no wrapper and no
+`elimination` route any more. `test_the_back_end_returns_P_with_the_pose_block_first`
+guards the whole path for every route.
 
 ## Testing
 
-88 tests, ~8 s. The suite is also the grading instrument, so a test's failure
+89 tests, ~8 s. The suite is also the grading instrument, so a test's failure
 message is student-facing: write them that way.
 
 Run the handout through the suite after any change to the solution blocks — the
 expected result is that only the tests touching given code pass, currently 30
-of 88. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
+of 89. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
 check that no graded work hides behind a given-code test, not a scoring floor.
 
 `tests/test_plotting.py` exists because every other test runs with

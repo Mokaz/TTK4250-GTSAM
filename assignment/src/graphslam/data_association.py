@@ -1,7 +1,6 @@
 """Data association: JCBB.
 
-Nothing in this file is graded -- it is handed to you the same way JCBB was
-handed to you in the EKF-SLAM assignment. It is worth reading anyway, because
+Nothing in this file is graded. It is worth reading anyway, because
 the quantity it consumes is the one you build in Task 1 (e) and (f): the
 innovation covariance ``S`` of the *whole local map jointly*, cross-covariances
 included. Individual compatibility only looks at the 2x2 diagonal blocks of

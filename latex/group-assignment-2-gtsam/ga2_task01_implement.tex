@@ -1,6 +1,6 @@
 \titledquestion{Implement factor graph SLAM}
 \label{q:task01}
-Where EKF-SLAM had a \pythoninline{predict} and an \pythoninline{update}, a factor graph SLAM system has three jobs: build the graph, recover a covariance from it, and use that covariance to decide which measurement belongs to which landmark.
+A factor graph SLAM system has three jobs: build the graph, recover a covariance from it, and use that covariance to decide which measurement belongs to which landmark.
 The back-end (iSAM2, through GTSAM) does the optimization for you; everything below is the part it does \emph{not} do.
 
 All functions are marked with \pythoninline{# TODO} in the code. Run the tests with \pythoninline{pytest}: how many of them pass is part of how we evaluate your submission as a whole. The GTSAM calls you need are listed in \pythoninline{docs/GTSAM.md}, and your editor shows their signatures.
@@ -78,22 +78,31 @@ Two conventions are worth fixing in your head before you start, because both pro
 
     % ------------------------------------------------------------------ (d)
     \breakans
-    \part Implement \input{py/gtsam/d/def.tex}, the measurement function \(\mathbf{h}(x_k, m^j)\) of (9.6), together with the two blocks of the Jacobian \(\mathbf{J}\) in (9.8) belonging to this pose and this landmark.
+    \part Implement \input{py/gtsam/d/def.tex}, the measurement function \(\mathbf{h}(x_k, m^j)\) of (9.6), together with the two blocks of the Jacobian \(\mathbf{J}\) in (9.8) belonging to this pose and this landmark. It returns the predicted measurement \(z = [\text{range}, \text{bearing}]\), the pose block \(\partial z / \partial x_k\) (\(2\times3\)) and the landmark block \(\partial z / \partial m^j\) (\(2\times2\)). GTSAM computes all of them for you, one row at a time:
+    \begin{enumerate}
+        \item Preallocate four sub-Jacobians, one row each: range and bearing, each with respect to the pose (\(1\times3\)) and to the landmark (\(1\times2\)), e.g.\ \pythoninline{H_range_pose = np.zeros((1, 3), order="F")}.
+        \item Pass them to the two GTSAM calls. Each returns its value and fills in its two sub-Jacobians:
+        \begin{center}
+            \pythoninline{pose.range(landmark, H_range_pose, H_range_landmark)} \\
+            \pythoninline{pose.bearing(landmark, H_bearing_pose, H_bearing_landmark)}
+        \end{center}
+        \item Stack the rows with \pythoninline{np.vstack}, range first and bearing second, to match the order of \(z\).
+    \end{enumerate}
 
-    This is the same quantity you implemented as \pythoninline{h} and \pythoninline{h_jac} in the EKF-SLAM assignment, but it is used for a different purpose: not to update a state, but to predict what the local map should look like so that the front-end can gate measurements against it.
+    The prediction does not update the estimate; the factors from (c) do that. It predicts what the local map should look like from \(x_k\), so that the front-end can gate the actual measurements against it in (f) and JCBB.
 
     \begin{longhint}
-        \pythoninline{gtsam.Pose2.range} and \pythoninline{gtsam.Pose2.bearing} both return their Jacobians through preallocated \pythoninline{order="F"} arrays, one row each. \pythoninline{bearing} returns a \pythoninline{gtsam.Rot2}; take \pythoninline{.theta()}.
+        \pythoninline{bearing} returns a \pythoninline{gtsam.Rot2}, not a float; take \pythoninline{.theta()}. The sub-Jacobians must be \pythoninline{float64} with exactly these shapes, or GTSAM raises a \pythoninline{TypeError}. Both are in the tangent space at the pose, the same convention as the pose covariance you recover in (e), so do not replace them with hand-derived \(\partial/\partial[x, y, \psi]\) Jacobians.
     \end{longhint}
     \begin{solution} \input{py/gtsam/d/solu.tex} \end{solution}
 
     % ------------------------------------------------------------------ (e)
     \breakans
-    \part Implement \input{py/gtsam/e/def.tex}.
+    \part Implement \input{py/gtsam/e/def.tex}, which builds the joint covariance \(P\) of the current pose and the landmarks in the local map: the \(P\) in \(S = HPH^T + R\) of (f).
 
-    Here is the part that has no EKF-SLAM counterpart. The EKF carried \(P\) around explicitly and handed it to you. A factor graph stores \emph{information}, not covariance, so before anything can be gated the joint marginal over the current pose and the nearby landmarks has to be \emph{recovered} from the back-end. That is Sec.\ 9.4: (9.27)--(9.28) show how the pose and pose-landmark blocks are extracted by back-substitution in \(R\), and Sec.\ 9.4.2 notes that pure landmark covariances are harder still because they are spread around in \(R\). GTSAM does this for you through the Bayes tree; the function \pythoninline{query_joint_covariance} is given.
+    A factor graph stores information, not covariance, so \(P\) has to be recovered from the graph (Sec.\ 9.4). GTSAM does that for you and hands you the result as a \pythoninline{gtsam.JointMarginal}, which stores \(P\) in blocks: \pythoninline{joint_marginal.at(key_i, key_j)} is the covariance between two variables. Your job is to put these blocks together into one matrix, in the order of \pythoninline{keys} -- the pose first, then the landmarks. Either stack the blocks with \pythoninline{np.block}, or preallocate \(P\) and fill each block in two loops.
 
-    What is \emph{not} done for you is the bookkeeping. \pythoninline{query_joint_covariance} returns the blocks of a joint marginal ordered by ascending key value, not in the order you asked for them. (GTSAM's own routes do not agree on block order, so the given code always queries in key order to make them consistent.) Since \pythoninline{gtsam.symbol_shorthand.L} encodes the character \texttt{'l'} (108) and \pythoninline{X} encodes \texttt{'x'} (120), every landmark key sorts before every pose key: a query for \(\left[X(k), L(3), L(7)\right]\) comes back ordered \(\left[L(3), L(7), X(k)\right]\). Stack a measurement Jacobian against that without noticing and the result is an innovation covariance that is subtly, silently wrong.
+    Two details matter. Include every block, also those between two landmarks: these cross-covariances are what let JCBB judge a set of associations jointly. And keep the order of \pythoninline{keys}, because (f) stacks the Jacobians in that order. A \(P\) in another order still gives a plausible-looking \(S\), just a wrong one.
 
     \begin{solution} \input{py/gtsam/e/solu.tex} \end{solution}
 
@@ -105,7 +114,7 @@ Two conventions are worth fixing in your head before you start, because both pro
     \]
     for the whole local map at once. This is (9.26) with \(P = (R^TR)^{-1}\) recovered in part (e), \(H\) the stacked Jacobian \(\mathbf{J}_a\) from part (d), and \(R\) the block-diagonal measurement noise \(\mathbf{R}_a\).
 
-    \(H\) is dense in its three leftmost columns, because every measurement depends on the pose, and block diagonal elsewhere, because measurement \(i\) depends only on landmark \(i\) -- the same structure as the EKF-SLAM measurement Jacobian, for the same reason.
+    \(H\) is dense in its three leftmost columns, because every measurement depends on the pose, and block diagonal elsewhere, because measurement \(i\) depends only on landmark \(i\).
 
     Note that \(P\) contains the cross-covariances \emph{between landmarks}. Those cross terms are the entire reason JCBB can be joint rather than a sequence of independent gates: they are what makes a set of individually plausible associations collectively implausible.
 
@@ -117,7 +126,7 @@ Two conventions are worth fixing in your head before you start, because both pro
     \begin{subparts}
         \subpart Implement \input{py/gtsam/g1/def.tex}, the inverse measurement function \(\mathbf{h}^{-1}(z, x)\).
 
-        Compare this with \pythoninline{add_landmarks} in the EKF-SLAM assignment, where you also had to propagate \(G_x^j P G_x^{jT} + G_z^j R G_z^{jT}\) by hand. Here you do not: once the landmark is connected by factors, the graph works its covariance out for itself. That is a direct consequence of (9.2) -- the posterior was always a product of factors, and the EKF's covariance bookkeeping was only ever a way of summarising it.
+        Only the position is needed, not a covariance: once the landmark is connected by factors, the graph works out its uncertainty for itself. That is a direct consequence of (9.2), the posterior is a product of factors. EKF-SLAM (Sec.\ 7.2) has to propagate a new landmark's covariance by hand instead.
         \begin{solution} \input{py/gtsam/g1/solu.tex} \end{solution}
 
         \subpart Implement \input{py/gtsam/g2/def.tex}, the \(M\) of \(N\) confirmation rule: promote a tentative landmark once it has been seen in at least \(M\) distinct time steps inside a sliding window of the last \(N\), inclusive at both ends. This is the same track initiation logic used in target tracking. Count \emph{time steps}, not observations: here they coincide, because association is one-to-one, but a front-end that allowed two measurements of one landmark in a single scan would otherwise confirm on one scan's worth of evidence -- exactly the clutter burst the rule exists to reject.

@@ -11,10 +11,6 @@ One time step, in the order it happens below:
 4. Associate the measurements, add a factor for every association, and hand the
    rest to the landmark manager (Task 1 g).
 5. Solve again, and log.
-
-Compare that with the EKF-SLAM loop: steps 1 and 5 are the back-end doing what
-``predict`` and ``update`` used to do, and step 3 is the work the EKF got for
-free because it carried ``P`` around explicitly.
 """
 
 from __future__ import annotations
@@ -120,16 +116,28 @@ class Backend:
         return gtsam.Marginals(self.graph, self._estimate).marginalCovariance(key)
 
     def joint_covariance(self, pose_key: int, local_map: fg.LocalMap) -> np.ndarray:
-        """Joint marginal over [pose] + local landmarks, in that order."""
-        if self.mode == "isam2":
-            return fg.local_joint_covariance(self.isam2, pose_key, local_map, self.config)
+        """Joint covariance P over [pose] + local landmarks, in that order (Sec. 9.4).
 
+        GTSAM recovers the joint marginal; Task 1 (e) assembles P from it. Two
+        GTSAM routes compute the same quantity, chosen by ``covariance_method``:
+
+        - ``bayes_tree``: ``isam2.jointMarginalCovariance``. GTSAM visits only
+          the cliques on the paths joining the queried variables in the Bayes
+          tree, so the cost tracks how close they are, not the size of the map.
+        - ``marginals``: a ``gtsam.Marginals`` rebuilt from the whole graph on
+          every call. Same answer; its cost grows with the graph. The batch
+          solver always uses this route.
+        """
         keys = [pose_key] + list(local_map.keys)
-        dims = [3] + [2] * len(local_map)
-        # Queried in key order, to match what reorder_joint_covariance expects.
-        marginals = gtsam.Marginals(self.graph, self._estimate)
-        covariance = marginals.jointMarginalCovariance(gtsam.KeyVector(sorted(keys))).fullMatrix()
-        return fg.reorder_joint_covariance(covariance, keys, dims)
+        query = gtsam.KeyVector(keys)
+
+        if self.mode == "isam2" and self.config.backend.covariance_method == "bayes_tree":
+            joint_marginal = self.isam2.jointMarginalCovariance(query)
+        else:
+            graph = self.isam2.getFactorsUnsafe() if self.mode == "isam2" else self.graph
+            joint_marginal = gtsam.Marginals(graph, self._estimate).jointMarginalCovariance(query)
+
+        return fg.assemble_joint_covariance(joint_marginal, keys)
 
 
 @dataclass

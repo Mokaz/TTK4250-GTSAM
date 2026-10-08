@@ -209,11 +209,11 @@ class BackendConfig:
             point of having it (see the book, Sec. 9.3.3 and 9.5).
         relinearize_threshold: iSAM2 relinearization threshold.
         relinearize_skip: relinearize only every N-th update.
-        covariance_method: how the joint marginal covariance is recovered --
-            ``"bayes_tree"`` (default, the incremental Steiner-tree query that
-            GTSAM 4.3 exposes on ISAM2), ``"marginals"`` (batch, recomputed
-            each call) or ``"elimination"`` (explicit Hessian inverse). All
-            three give the same answer; they differ enormously in cost.
+        covariance_method: how GTSAM recovers the joint marginal covariance --
+            ``"bayes_tree"`` (default: ``isam2.jointMarginalCovariance``, the
+            incremental Bayes-tree query) or ``"marginals"`` (a batch
+            ``gtsam.Marginals`` rebuilt on every call). Both give the same
+            answer; they differ enormously in cost.
         robust_kernel: ``"none"`` or ``"huber"`` on the landmark measurement
             factors.
         huber_k: Huber parameter, in units of the whitened residual.
@@ -231,7 +231,7 @@ class BackendConfig:
         if self.solver not in solver_options:
             raise ValueError(f"solver must be one of {solver_options}, got {self.solver}")
 
-        covariance_options = ["bayes_tree", "marginals", "elimination"]
+        covariance_options = ["bayes_tree", "marginals"]
         if self.covariance_method not in covariance_options:
             raise ValueError(
                 f"covariance_method must be one of {covariance_options}, "
@@ -264,8 +264,7 @@ class VictoriaParkConfig:
             but GNSS gives no heading, so this one is fixed by hand. SLAM cannot
             observe it -- turning it rotates the whole map and trajectory
             without changing their shape -- so it matters only for comparing
-            against GNSS. 36 deg is inherited from the EKF-SLAM assignment and
-            is the best-fit rotation of the estimate onto GNSS to within
+            against GNSS. 36 deg is the best-fit rotation of the estimate onto GNSS to within
             0.01 deg. Its prior std. dev. is ``noise.sigma_init_pose_yaw_deg``.
     """
 

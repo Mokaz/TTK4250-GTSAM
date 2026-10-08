@@ -66,7 +66,7 @@ Ten functions, all marked `TODO` in the source and graded by `pytest`:
 | c2 | `add_odometry_factor` | `src/graphslam/factor_graph.py` |
 | c3 | `add_landmark_factor` | `src/graphslam/factor_graph.py` |
 | d | `predict_measurement` | `src/graphslam/factor_graph.py` |
-| e | `reorder_joint_covariance` | `src/graphslam/factor_graph.py` |
+| e | `assemble_joint_covariance` | `src/graphslam/factor_graph.py` |
 | f | `innovation_covariance` | `src/graphslam/factor_graph.py` |
 | g1 | `inverse_measurement` | `src/graphslam/factor_graph.py` |
 | g2 | `TentativeLandmark.is_confirmed` | `src/graphslam/landmark_manager.py` |

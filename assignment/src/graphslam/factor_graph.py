@@ -221,59 +221,48 @@ def inverse_measurement(pose: gtsam.Pose2, measurement: np.ndarray) -> np.ndarra
 
 
 # ---------------------------------------------------------------------------
-# Task 1 (e): recovering a joint marginal covariance from the graph
+# Task 1 (e): the joint covariance of the local map
 # ---------------------------------------------------------------------------
 
 
-def reorder_joint_covariance(
-    covariance: np.ndarray,
+def assemble_joint_covariance(
+    joint_marginal: gtsam.JointMarginal,
     keys: list[int],
-    dims: list[int],
 ) -> np.ndarray:
-    """Reorder a joint covariance from ascending key order to the order of ``keys``. Task 1 (e).
+    """Assemble the joint covariance P over ``keys`` from a GTSAM joint marginal. Task 1 (e).
 
     Parameters
     ----------
-    covariance : np.ndarray, shape=(D, D)
-        Joint covariance as returned by :func:`query_joint_covariance`, with its
-        blocks in ascending key order.
+    joint_marginal : gtsam.JointMarginal
+        The joint marginal over ``keys``, as returned by
+        ``isam2.jointMarginalCovariance`` or ``gtsam.Marginals(...).jointMarginalCovariance``.
     keys : list[int]
-        The keys in the order you want them, e.g. ``[X(k), L(3), L(7)]``.
-    dims : list[int]
-        Dimension of each key in ``keys`` (3 for a Pose2, 2 for a Point2).
+        The variables, in the order the blocks of P must follow: the pose first,
+        then the local landmarks, e.g. ``[X(k), L(3), L(7)]``.
 
     Returns
     -------
-    np.ndarray, shape=(D, D)
-        The same covariance with its blocks in the order of ``keys``.
+    np.ndarray, shape=(3 + 2n, 3 + 2n)
+        P, whose block (i, j) is the covariance between ``keys[i]`` and ``keys[j]``.
     """
-    # TODO(e): build the index permutation and apply it to both rows and columns.
+    # TODO(e): fill P block by block from joint_marginal.at(key_i, key_j).
     # BEGIN SOLUTION
-    if len(keys) != len(dims):
-        raise ValueError(f"keys and dims must have equal length, got {len(keys)} and {len(dims)}")
+    return np.block([
+        [joint_marginal.at(key_i, key_j) for key_j in keys]
+        for key_i in keys
+    ])
 
-    total_dim = int(np.sum(dims))
-    if covariance.shape != (total_dim, total_dim):
-        raise ValueError(
-            f"covariance has shape {covariance.shape}, expected ({total_dim}, {total_dim})"
-        )
-
-    # Position of each requested key once the keys are sorted ascending, which
-    # is the order GTSAM used when it laid out the returned matrix.
-    sorted_positions = np.argsort(np.asarray(keys, dtype=np.uint64), kind="stable")
-
-    # Offset of each block inside the returned matrix.
-    offsets = np.zeros(len(keys), dtype=int)
-    offset = 0
-    for position in sorted_positions:
-        offsets[position] = offset
-        offset += dims[position]
-
-    permutation = np.concatenate(
-        [np.arange(offsets[i], offsets[i] + dims[i]) for i in range(len(keys))]
-    ).astype(int)
-
-    return covariance[np.ix_(permutation, permutation)]
+    # Equivalent, with two loops filling a preallocated P:
+    #
+    # dims = [joint_marginal.at(key, key).shape[0] for key in keys]
+    # offsets = np.concatenate([[0], np.cumsum(dims)])  # where each block starts
+    # P = np.zeros((offsets[-1], offsets[-1]))
+    # for i, key_i in enumerate(keys):
+    #     for j, key_j in enumerate(keys):
+    #         rows = slice(offsets[i], offsets[i + 1])
+    #         cols = slice(offsets[j], offsets[j + 1])
+    #         P[rows, cols] = joint_marginal.at(key_i, key_j)
+    # return P
     # END SOLUTION
 
 
@@ -384,108 +373,3 @@ def extract_local_map(
     local.predicted_measurements = np.asarray(predicted, dtype=float).reshape(-1, 2)
 
     return local
-
-
-# ---------------------------------------------------------------------------
-# Raw covariance queries  (given)
-# ---------------------------------------------------------------------------
-#
-# Three routes to the same quantity. ``bayes_tree`` is the default and the only
-# one you need; the other two exist so you can time them against it.
-
-
-def _query_bayes_tree(isam2: gtsam.ISAM2, keys: list[int]) -> np.ndarray:
-    """Ask the Bayes tree directly (Sec. 9.4, Sec. 9.5).
-
-    GTSAM walks the Steiner tree of the queried keys -- the cliques on the paths
-    joining them -- and compresses long non-branching stretches using shortcut
-    conditionals. The cost depends on how close the queried variables are in the
-    tree, not on how large the map is, which is what makes a joint covariance
-    per time step affordable at all.
-    """
-    return isam2.jointMarginalCovariance(gtsam.KeyVector(keys)).fullMatrix()
-
-
-def _query_marginals(isam2: gtsam.ISAM2, keys: list[int]) -> np.ndarray:
-    """Rebuild a batch ``Marginals`` over the whole graph and query that.
-
-    The same answer, recomputed from scratch on every call. Useful as a
-    reference implementation and as a timing baseline for the method above.
-    """
-    marginals = gtsam.Marginals(isam2.getFactorsUnsafe(), isam2.calculateEstimate())
-    return marginals.jointMarginalCovariance(gtsam.KeyVector(keys)).fullMatrix()
-
-
-def _query_elimination(isam2: gtsam.ISAM2, keys: list[int]) -> np.ndarray:
-    """Linearize, marginalize, then invert the Hessian by hand (Sec. 9.4.1).
-
-    The most explicit of the three: it forms ``R^T R`` restricted to the queried
-    variables and inverts it densely. Slow, and worth reading once, because it
-    is the formula from the book with nothing hidden behind an API.
-
-    One caveat: this linearizes at ``getLinearizationPoint()``, which is where
-    iSAM2 last relinearized and not necessarily the current estimate. Raise
-    ``backend.relinearize_threshold`` far enough and this method stops agreeing
-    exactly with the other two -- which is itself a nice thing to observe.
-    """
-    linear_graph = isam2.getFactorsUnsafe().linearize(isam2.getLinearizationPoint())
-    marginal_graph = linear_graph.marginal(gtsam.KeyVector(keys))
-    hessian, _ = marginal_graph.hessian()
-    return np.linalg.inv(hessian)
-
-
-_COVARIANCE_QUERIES = {
-    "bayes_tree": _query_bayes_tree,
-    "marginals": _query_marginals,
-    "elimination": _query_elimination,
-}
-
-
-def query_joint_covariance(
-    isam2: gtsam.ISAM2,
-    keys: list[int],
-    method: str = "bayes_tree",
-) -> np.ndarray:
-    """Recover the joint marginal covariance over ``keys`` from the back-end.
-
-    The blocks come back in **ascending key order**, not in the order you asked
-    for them -- see :func:`reorder_joint_covariance`.
-
-    The three methods do not agree on block order by themselves: the Bayes-tree
-    and ``Marginals`` queries follow the order of the requested keys, while the
-    elimination route follows the factor graph's own key order. Querying with
-    the keys already sorted makes all three return the same layout.
-
-    All three methods compute the same quantity by different routes. Timing them
-    against each other on Victoria Park is a worthwhile experiment in itself:
-    set ``backend.covariance_method`` and compare the logged
-    ``duration_covariance_extraction``.
-    """
-    try:
-        query = _COVARIANCE_QUERIES[method]
-    except KeyError:
-        raise ValueError(
-            f"Unknown covariance_method {method!r}, "
-            f"expected one of {sorted(_COVARIANCE_QUERIES)}"
-        ) from None
-
-    return query(isam2, sorted(keys))
-
-
-def local_joint_covariance(
-    isam2: gtsam.ISAM2,
-    pose_key: int,
-    local_map: LocalMap,
-    config: SlamConfig,
-) -> np.ndarray:
-    """Joint marginal over ``[pose] + local landmarks``, in that order.
-
-    Thin wrapper that ties :func:`query_joint_covariance` (given) together with
-    :func:`reorder_joint_covariance` (yours).
-    """
-    keys = [pose_key] + list(local_map.keys)
-    dims = [3] + [2] * len(local_map)
-
-    covariance = query_joint_covariance(isam2, keys, config.backend.covariance_method)
-
-    return reorder_joint_covariance(covariance, keys, dims)
