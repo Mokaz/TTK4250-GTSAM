@@ -9,7 +9,7 @@ One time step, in the order it happens below:
 3. Recover the joint marginal covariance over the pose and those landmarks, and
    turn it into an innovation covariance (Task 1 e, f).
 4. Associate the measurements, add a factor for every association, and hand the
-   rest to the landmark manager (Task 1 g).
+   rest to the landmark manager (Task 1 (g) and (h)).
 5. Solve again, and log.
 """
 

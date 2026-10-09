@@ -32,6 +32,7 @@ def _integrate_unicycle(velocity: float, yaw_rate: float, dt: float) -> np.ndarr
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.a
 def test_relative_pose_straight_motion() -> None:
     pose = relative_pose(vel_encoder=2.0, steer=0.0, dt=0.5)
 
@@ -40,6 +41,7 @@ def test_relative_pose_straight_motion() -> None:
     )
 
 
+@pytest.mark.a
 def test_relative_pose_applies_the_encoder_offset_correction() -> None:
     """The encoder is off the centre line, so v_body != v_encoder when turning."""
     vel_encoder, steer, dt = 3.0, 0.20, 0.4
@@ -52,6 +54,7 @@ def test_relative_pose_applies_the_encoder_offset_correction() -> None:
     assert pose.theta() == pytest.approx(expected_yaw, rel=1e-9)
 
 
+@pytest.mark.a
 def test_relative_pose_uses_the_car_it_is_given() -> None:
     """The geometry must come from the ``car`` argument, not be hard-coded.
 
@@ -69,6 +72,7 @@ def test_relative_pose_uses_the_car_it_is_given() -> None:
     )
 
 
+@pytest.mark.a
 def test_relative_pose_follows_an_arc_not_a_straight_line() -> None:
     """Exact integration of the twist, i.e. Expmap -- not an Euler step."""
     vel_encoder, steer, dt = 4.0, 0.35, 1.0
@@ -87,6 +91,7 @@ def test_relative_pose_follows_an_arc_not_a_straight_line() -> None:
     assert abs(pose.y()) > 1e-3, "the increment should have a lateral component"
 
 
+@pytest.mark.a
 def test_relative_pose_is_zero_for_zero_velocity() -> None:
     pose = relative_pose(vel_encoder=0.0, steer=0.3, dt=1.0)
 
@@ -100,6 +105,7 @@ def test_relative_pose_is_zero_for_zero_velocity() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.b
 def test_preintegrate_of_nothing_is_the_identity() -> None:
     pose, covariance = preintegrate([], [])
 
@@ -109,6 +115,7 @@ def test_preintegrate_of_nothing_is_the_identity() -> None:
     np.testing.assert_allclose(covariance, np.zeros((3, 3)), atol=1e-12)
 
 
+@pytest.mark.b
 def test_preintegrate_compounds_the_mean() -> None:
     a = gtsam.Pose2(1.0, 0.0, np.pi / 2)
     b = gtsam.Pose2(2.0, 0.0, 0.0)
@@ -123,6 +130,7 @@ def test_preintegrate_compounds_the_mean() -> None:
     )
 
 
+@pytest.mark.b
 def test_preintegrate_of_a_single_increment_returns_its_covariance() -> None:
     """Composing onto the identity must leave the covariance untouched."""
     increment = gtsam.Pose2(1.5, -0.2, 0.3)
@@ -133,6 +141,7 @@ def test_preintegrate_of_a_single_increment_returns_its_covariance() -> None:
     np.testing.assert_allclose(compounded_cov, covariance, atol=1e-12)
 
 
+@pytest.mark.b
 def test_preintegrate_transports_covariance_through_the_second_increment() -> None:
     """The first increment's covariance is rotated by the adjoint of the second."""
     first = gtsam.Pose2(1.0, 0.0, 0.4)
@@ -147,6 +156,7 @@ def test_preintegrate_transports_covariance_through_the_second_increment() -> No
     np.testing.assert_allclose(compounded_cov, expected, atol=1e-10)
 
 
+@pytest.mark.b
 def test_preintegrate_does_not_simply_sum_covariances() -> None:
     """A rotation mixes the components: the result is not the naive sum."""
     increments = [gtsam.Pose2(1.0, 0.0, 0.5), gtsam.Pose2(1.0, 0.0, 0.5)]
@@ -161,6 +171,7 @@ def test_preintegrate_does_not_simply_sum_covariances() -> None:
     assert np.all(np.linalg.eigvalsh(compounded_cov) >= -1e-12)
 
 
+@pytest.mark.b
 def test_preintegrate_covariance_grows_with_more_increments() -> None:
     increment = gtsam.Pose2(1.0, 0.0, 0.1)
     covariance = np.diag([0.04, 0.01, 0.0009])

@@ -31,6 +31,9 @@ It needs LuaLaTeX (fontspec) and `-shell-escape` (minted). Check the log for
 If the build fails with "Serious error that appeared not to generate a log
 file" or a locked `.data.minted` file, Martin's editor is building into the same
 `build/` at the same time: wait for its `latexmk` to finish and rerun.
+A collision can also leave a corrupt PDF while your own `latexmk` exits 0, so
+check `tasklist | findstr latexmk` before building, and verify afterwards that
+`pdftotext build/ga2_graded2.pdf -` prints no "Syntax Error" lines.
 
 `assignment/` is the source of truth. `handout/` is regenerated from it with
 `python tools/make_handout.py --out ../handout`; the LaTeX code snippets come
@@ -105,8 +108,8 @@ Each is wrapped in `# TODO(<task>):` + `# BEGIN SOLUTION` / `# END SOLUTION`.
 | d | `predict_measurement` | `factor_graph.py` | (9.7), (9.8) |
 | e | `assemble_joint_covariance` | `factor_graph.py` | Sec. 9.4.1, (9.27)–(9.28) |
 | f | `innovation_covariance` | `factor_graph.py` | **(9.26)** |
-| g1 | `inverse_measurement` | `factor_graph.py` | (9.2) |
-| g2 | `TentativeLandmark.is_confirmed` | `landmark_manager.py` | track initiation |
+| g | `inverse_measurement` | `factor_graph.py` | (9.2) |
+| h | `TentativeLandmark.is_confirmed` | `landmark_manager.py` | track initiation |
 
 Book references are to `sf2026c.pdf` (the 2026 edition with Lie theory).
 
@@ -135,12 +138,21 @@ guards the whole path for every route.
 
 ## Testing
 
-89 tests, ~8 s. The suite is also the grading instrument, so a test's failure
+90 tests, ~8 s. The suite is also the grading instrument, so a test's failure
 message is student-facing: write them that way.
 
+Every test of a graded function carries one pytest marker named after its part
+(`@pytest.mark.c3`), so students run `pytest -m c3` (decided 9 Oct; the task
+text and README say so). A part's tests must need only that part: on the empty
+handout, `pytest -m X` fails with `NotImplementedError: Task 1 (X)` and nothing
+else. Build test inputs from GTSAM directly (`_exact_measurement`), not from
+another graded function. Given-code tests in the graded files are marked
+`given`; `tests/test_markers.py` enforces all of this, and `--strict-markers`
+catches typos.
+
 Run the handout through the suite after any change to the solution blocks — the
-expected result is that only the tests touching given code pass, currently 30
-of 89. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
+expected result is that only the tests touching given code pass, currently 31
+of 90. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
 check that no graded work hides behind a given-code test, not a scoring floor.
 
 `tests/test_plotting.py` exists because every other test runs with
@@ -193,7 +205,13 @@ run is the one Task 3 asks for; it diverges completely and takes twice as long.
   update both together.
 - `Car.a` / `Car.b` (lidar offset) parsed but unused. Backlogged (2 Oct) as a
   possible optional exercise; the system works without it.
-- Reference solution not yet solved once from the student side and timed.
+- **Task 1 solved from the student side (9 Oct).** Martin solved the handout
+  in `ga2_student` (env `ga2_student`), not timed exactly but "some hours".
+  The friction he hit became hints in the task text: the `Pose2.Identity()`
+  start for (b), the sub-Jacobian out-arguments for (d), `Point2(range, 0)` for
+  (g), `supporting_observations` and both off-by-ones for (h). Decided: Task 1
+  stays at its current size. His `run_sim` matched the reference step for step
+  (same association counts at all 999 steps, 76 of 78, 0.79 m).
 - Victoria Park start heading is `victoria_park.initial_heading_deg` (36°,
   inherited from the EKF-SLAM assignment). Best-fit rotation onto GNSS over
   2000 steps is 35.99°, so leave it. It is unobservable: changing it rotates

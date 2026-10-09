@@ -6,14 +6,6 @@ def innovation_covariance(
     measurement_cov: np.ndarray,
 ) -> np.ndarray:
     n = len(jacobians_pose)
-    if len(jacobians_landmark) != n:
-        raise ValueError(
-            "jacobians_pose and jacobians_landmark must have equal length, "
-            f"got {n} and {len(jacobians_landmark)}"
-        )
-
-    if n == 0:
-        return np.zeros((0, 0))
 
     H = np.zeros((2 * n, 3 + 2 * n))
     for i in range(n):

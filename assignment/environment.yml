@@ -20,7 +20,7 @@ dependencies:
   - python=3.11
 
   # 4.3 is the first release exposing ISAM2.jointMarginalCovariance, which is
-  # what graphslam.factor_graph.query_joint_covariance calls. Do not relax.
+  # what the back-end (graphslam.slam.Backend.joint_covariance) calls. Do not relax.
   - gtsam>=4.3,<5
 
   - numpy>=1.26

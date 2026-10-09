@@ -1,6 +1,6 @@
 """Landmark birth: when a repeated detection becomes a map landmark (M of N).
 
-Only :meth:`TentativeLandmark.is_confirmed` is graded: Task 1 (g2). The rest of
+Only :meth:`TentativeLandmark.is_confirmed` is graded: Task 1 (h). The rest of
 this file is given.
 """
 
@@ -75,7 +75,7 @@ class TentativeLandmark:
         self.position = (1.0 - alpha) * self.position + alpha * new_position
 
     def is_confirmed(self, current_step: int, M: int, N: int) -> bool:
-        """Whether this landmark was seen in at least ``M`` of the last ``N`` steps. Task 1 (g2).
+        """Whether this landmark was seen in at least ``M`` of the last ``N`` steps. Task 1 (h).
 
         Parameters
         ----------
@@ -92,7 +92,7 @@ class TentativeLandmark:
         bool
             Whether the landmark should be promoted into the graph.
         """
-        # TODO(g2): count supporting observations inside the window and compare to M.
+        # TODO(h): count supporting observations inside the window and compare to M.
         # BEGIN SOLUTION
         window_start = current_step - N + 1
         hits_in_window = sum(

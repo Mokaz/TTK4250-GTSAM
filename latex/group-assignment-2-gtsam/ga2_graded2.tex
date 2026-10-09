@@ -3,6 +3,9 @@
 \input{../env/mycommands}
 \input{../env/pystuff}
 \input{../env/newcommands}
+% Sub-parts are labelled (c1), (c2), ... to match the code, the tests and pytest -m.
+\renewcommand{\thesubpart}{\thepartno\arabic{subpart}}
+\renewcommand{\subpartlabel}{(\thesubpart)}
 
 \printanswers
 \assignmentnr{2}

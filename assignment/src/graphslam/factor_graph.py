@@ -1,6 +1,6 @@
 """Factor graph construction, measurement prediction and covariance recovery.
 
-The functions marked ``TODO`` are Task 1 (c) to (g1); the assignment text
+The functions marked ``TODO`` are Task 1 (c) to (g); the assignment text
 explains each one. The rest of this file is given.
 """
 
@@ -197,7 +197,7 @@ def predict_measurement(
 
 
 def inverse_measurement(pose: gtsam.Pose2, measurement: np.ndarray) -> np.ndarray:
-    """World-frame landmark position from one range-bearing measurement. Task 1 (g1).
+    """World-frame landmark position from one range-bearing measurement. Task 1 (g).
 
     Parameters
     ----------
@@ -211,7 +211,7 @@ def inverse_measurement(pose: gtsam.Pose2, measurement: np.ndarray) -> np.ndarra
     np.ndarray, shape=(2,)
         Landmark position in the world frame.
     """
-    # TODO(g1): rotate by the bearing, translate by the range, map to the world frame.
+    # TODO(g): rotate by the bearing, translate by the range, map to the world frame.
     # BEGIN SOLUTION
     measured_range, measured_bearing = float(measurement[0]), float(measurement[1])
     landmark_body = gtsam.Rot2(measured_bearing).rotate(gtsam.Point2(measured_range, 0.0))
@@ -299,14 +299,6 @@ def innovation_covariance(
     # TODO(f): build the stacked H, build the block-diagonal R, and form S.
     # BEGIN SOLUTION
     n = len(jacobians_pose)
-    if len(jacobians_landmark) != n:
-        raise ValueError(
-            "jacobians_pose and jacobians_landmark must have equal length, "
-            f"got {n} and {len(jacobians_landmark)}"
-        )
-
-    if n == 0:
-        return np.zeros((0, 0))
 
     H = np.zeros((2 * n, 3 + 2 * n))
     for i in range(n):

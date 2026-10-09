@@ -3,13 +3,16 @@
 A factor graph SLAM system has three jobs: build the graph, recover a covariance from it, and use that covariance to decide which measurement belongs to which landmark.
 The back-end (iSAM2, through GTSAM) does the optimization for you; everything below is the part it does \emph{not} do.
 
-All functions are marked with \pythoninline{# TODO} in the code. Run the tests with \pythoninline{pytest}: how many of them pass is part of how we evaluate your submission as a whole. The GTSAM calls you need are listed in \pythoninline{docs/GTSAM.md}, and your editor shows their signatures.
+All functions are marked with \pythoninline{# TODO} in the code. The GTSAM calls you need are listed in \pythoninline{docs/GTSAM.md}, and your editor shows their signatures.
 
-Two conventions are worth fixing in your head before you start, because both produce systems that run happily while being wrong:
-\begin{itemize}
-    \item Measurements are ordered \([\text{range}, \text{bearing}]\) everywhere in this code base. GTSAM's \pythoninline{BearingRangeFactor2D} takes \emph{bearing first}.
-    \item The covariance GTSAM reports for a \pythoninline{Pose2}, and the Jacobians returned by \pythoninline{Pose2.range} and \pythoninline{Pose2.bearing}, both live in the \emph{tangent space} at the current estimate (Sec.\ 6.2 in the book), not in raw \((x, y, \psi)\) coordinates. Used together they are consistent. Mixing either with a hand-derived \(\partial/\partial[x, y, \psi]\) is not.
-\end{itemize}
+\paragraph{Testing your code.}
+Each part has its own tests, selected by a pytest marker named after the part: \pythoninline{pytest -m b} runs the tests for (b), and \pythoninline{pytest -m c2} those for (c2). Add \pythoninline{-x} to stop at the first failure. Plain \pythoninline{pytest} runs everything, including the end-to-end tests, which need all parts. How many tests pass is part of how we evaluate your submission as a whole.
+
+% Two conventions are worth fixing in your head before you start, because both produce systems that run happily while being wrong:
+% \begin{itemize}
+%     \item Measurements are ordered \([\text{range}, \text{bearing}]\) everywhere in this code base. GTSAM's \pythoninline{BearingRangeFactor2D} takes \emph{bearing first}.
+%     \item The covariance GTSAM reports for a \pythoninline{Pose2}, and the Jacobians returned by \pythoninline{Pose2.range} and \pythoninline{Pose2.bearing}, both live in the \emph{tangent space} at the current estimate (Sec.\ 6.2 in the book), not in raw \((x, y, \psi)\) coordinates. Used together they are consistent. Mixing either with a hand-derived \(\partial/\partial[x, y, \psi]\) is not.
+% \end{itemize} % TODO: Maybe not needed for tasks? Check if necessary
 
 \begin{parts}
 
@@ -100,7 +103,7 @@ Two conventions are worth fixing in your head before you start, because both pro
     \breakans
     \part Implement \input{py/gtsam/e/def.tex}, which builds the joint covariance \(P\) of the current pose and the landmarks in the local map: the \(P\) in \(S = HPH^T + R\) of (f).
 
-    A factor graph stores information, not covariance, so \(P\) has to be recovered from the graph (Sec.\ 9.4). GTSAM does that for you and hands you the result as a \pythoninline{gtsam.JointMarginal}, which stores \(P\) in blocks: \pythoninline{joint_marginal.at(key_i, key_j)} is the covariance between two variables. Your job is to put these blocks together into one matrix, in the order of \pythoninline{keys} -- the pose first, then the landmarks. Either stack the blocks with \pythoninline{np.block}, or preallocate \(P\) and fill each block in two loops.
+    A factor graph stores information, not covariance, so \(P\) has to be recovered from the graph (Sec.\ 9.4). GTSAM does that for you and hands you the result as a \pythoninline{gtsam.JointMarginal}, which stores \(P\) in blocks: \pythoninline{joint_marginal.at(key_i, key_j)} is the covariance between two variables. Your job is to put these blocks together into one matrix, in the order of \pythoninline{keys} -- the pose first, then the landmarks. Either stack the blocks with \pythoninline{np.block}, or preallocate \(P\) and fill each block in two loops. For the second approach: using \\ \pythoninline{joint_marginal.at(key, key).shape[0]} to find the size of the covariance block corresponding to a key may be useful.
 
     Two details matter. Include every block, also those between two landmarks: these cross-covariances are what let JCBB judge a set of associations jointly. And keep the order of \pythoninline{keys}, because (f) stacks the Jacobians in that order. A \(P\) in another order still gives a plausible-looking \(S\), just a wrong one.
 
@@ -114,23 +117,42 @@ Two conventions are worth fixing in your head before you start, because both pro
     \]
     for the whole local map at once. This is (9.26) with \(P = (R^TR)^{-1}\) recovered in part (e), \(H\) the stacked Jacobian \(\mathbf{J}_a\) from part (d), and \(R\) the block-diagonal measurement noise \(\mathbf{R}_a\).
 
-    \(H\) is dense in its three leftmost columns, because every measurement depends on the pose, and block diagonal elsewhere, because measurement \(i\) depends only on landmark \(i\).
+    Here \(n\) = \pythoninline{len(jacobians_pose)} is the number of landmarks in the local map. Keep the dimensions in mind: \(P\) is \((3+2n)\times(3+2n)\), pose first and then each landmark; \(H\) is \(2n\times(3+2n)\), two rows per measurement; \(R\) and the returned \(S\) are \(2n\times2n\). For \(n = 3\), with \(H^x_i\) = \pythoninline{jacobians_pose[i]} (\(2\times3\)) and \(H^m_i\) = \pythoninline{jacobians_landmark[i]} (\(2\times2\)):
+    \[
+        H = \bordermatrix{
+                & x_k   & m_0   & m_1   & m_2   \cr
+            z_0 & H^x_0 & H^m_0 & 0     & 0     \cr
+            z_1 & H^x_1 & 0     & H^m_1 & 0     \cr
+            z_2 & H^x_2 & 0     & 0     & H^m_2 \cr
+        }
+    \]
+    \(H\) is dense in its three leftmost columns, because every measurement depends on the pose, and block diagonal elsewhere, because measurement \(i\) depends only on landmark \(i\). \(R\) is \pythoninline{measurement_cov} repeated \(n\) times along its diagonal, since the measurements are independent.
 
-    Note that \(P\) contains the cross-covariances \emph{between landmarks}. Those cross terms are the entire reason JCBB can be joint rather than a sequence of independent gates: they are what makes a set of individually plausible associations collectively implausible.
+    % Note that \(P\) contains the cross-covariances \emph{between landmarks}. Those cross terms are the entire reason JCBB can be joint rather than a sequence of independent gates: they are what makes a set of individually plausible associations collectively implausible. % TODO: I dont think this paragraph is necessary 
 
     \begin{solution} \input{py/gtsam/f/solu.tex} \end{solution}
 
     % ------------------------------------------------------------------ (g)
     \breakans
-    \part Landmark birth. A measurement that JCBB could not associate is either a landmark you have not seen before, or clutter. Putting every one of them straight into the graph fills the map with spurious landmarks that then attract wrong associations; never putting them in means the map never grows.
-    \begin{subparts}
-        \subpart Implement \input{py/gtsam/g1/def.tex}, the inverse measurement function \(\mathbf{h}^{-1}(z, x)\).
+    \part Landmark birth. A measurement that JCBB could not associate is either a landmark you have not seen before, or clutter. Putting every one of them straight into the graph fills the map with spurious landmarks that then attract wrong associations; never putting them in means the map never grows. This part places a new landmark; (h) decides when it enters the graph.
 
-        Only the position is needed, not a covariance: once the landmark is connected by factors, the graph works out its uncertainty for itself. That is a direct consequence of (9.2), the posterior is a product of factors. EKF-SLAM (Sec.\ 7.2) has to propagate a new landmark's covariance by hand instead.
-        \begin{solution} \input{py/gtsam/g1/solu.tex} \end{solution}
+    Implement \input{py/gtsam/g/def.tex}, the inverse measurement function \(\mathbf{h}^{-1}(z, x)\).
 
-        \subpart Implement \input{py/gtsam/g2/def.tex}, the \(M\) of \(N\) confirmation rule: promote a tentative landmark once it has been seen in at least \(M\) distinct time steps inside a sliding window of the last \(N\), inclusive at both ends. This is the same track initiation logic used in target tracking. Count \emph{time steps}, not observations: here they coincide, because association is one-to-one, but a front-end that allowed two measurements of one landmark in a single scan would otherwise confirm on one scan's worth of evidence -- exactly the clutter burst the rule exists to reject.
-        \begin{solution} \input{py/gtsam/g2/solu.tex} \end{solution}
-    \end{subparts}
+    Only the position is needed, not a covariance: once the landmark is connected by factors, the graph works out its uncertainty for itself. That is a direct consequence of (9.2), the posterior is a product of factors. EKF-SLAM (Sec.\ 7.2) has to propagate a new landmark's covariance by hand instead.
+
+    \begin{longhint}
+        Work in two steps. First the landmark in the body frame: a range alone is not a point, but \pythoninline{gtsam.Point2(range, 0.0)} is the landmark straight ahead, and \pythoninline{gtsam.Rot2(bearing).rotate(...)} turns it to the measured bearing, giving \((r\cos b,\ r\sin b)\). Then \pythoninline{pose.transformFrom(...)} takes that point from the body frame to the world frame.
+    \end{longhint}
+    \begin{solution} \input{py/gtsam/g/solu.tex} \end{solution}
+
+    % ------------------------------------------------------------------ (h)
+    \part Implement \input{py/gtsam/h/def.tex}, the \(M\) of \(N\) confirmation rule: promote a tentative landmark once it has been seen in at least \(M\) distinct time steps inside a sliding window of the last \(N\), inclusive at both ends. This is the same track initiation logic used in target tracking. Count \emph{time steps}, not observations: here they coincide, because association is one-to-one, but a front-end that allowed two measurements of one landmark in a single scan would otherwise confirm on one scan's worth of evidence -- exactly the clutter burst the rule exists to reject.
+
+    The evidence for a tentative landmark is the list \pythoninline{self.supporting_observations}. For every time step the landmark was seen in, it holds one \pythoninline{SupportingObservation} with the time step \pythoninline{.step} and the measurement \pythoninline{.measurement} (\([\text{range}, \text{bearing}]\)). The given manager fills it for you: the measurement that spawns a tentative landmark is its first entry, and \pythoninline{update} appends every later measurement associated with it, oldest first. Once the landmark is confirmed, each entry becomes a landmark factor in the graph. Your function only reads this list: count the entries whose \pythoninline{.step} lies inside the window, and compare with \(M\).
+
+    \begin{longhint}
+        Both boundaries are easy to get off by one, so check them on small numbers. A window of the last \(N\) steps that ends at, and includes, \pythoninline{current_step} contains \(N\) steps. With \(N = 3\) and \pythoninline{current_step} 10 they are 8, 9 and 10, so the window starts at \(10 - 3 + 1\), not \(10 - 3\). With \(N = 1\) the window is the current step alone. An observation from the first step of the window counts, so compare its step to the start with \(\geq\). ``At least \(M\)'' means that exactly \(M\) hits is enough, so compare the count with \(\geq\) as well. The tests check both ends of the window.
+    \end{longhint}
+    \begin{solution} \input{py/gtsam/h/solu.tex} \end{solution}
 
 \end{parts}

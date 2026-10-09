@@ -40,7 +40,7 @@ in this code, is ordered `[x, y, theta]` and lives at the pose itself (Sec. 6.2)
 |---|---|
 | `gtsam.Rot2(angle)` | A 2D rotation by `angle` radians. `gtsam.Rot2.fromAngle(angle)` is the same. |
 | `r.theta()` | Back to an angle in radians, wrapped to (−π, π]. |
-| `r.rotate(p)` | Rotate a 2D point. |
+| `r.rotate(p)` | Rotate a 2D point `p` (a `Point2`, not a float). |
 | `gtsam.Point2(x, y)` | A 2D point. In Python this is simply a numpy array of shape (2,); any such array works wherever GTSAM wants a point. |
 
 ## Jacobians: how GTSAM hands them back

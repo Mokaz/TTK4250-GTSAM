@@ -68,12 +68,15 @@ Ten functions, all marked `TODO` in the source and graded by `pytest`:
 | d | `predict_measurement` | `src/graphslam/factor_graph.py` |
 | e | `assemble_joint_covariance` | `src/graphslam/factor_graph.py` |
 | f | `innovation_covariance` | `src/graphslam/factor_graph.py` |
-| g1 | `inverse_measurement` | `src/graphslam/factor_graph.py` |
-| g2 | `TentativeLandmark.is_confirmed` | `src/graphslam/landmark_manager.py` |
+| g | `inverse_measurement` | `src/graphslam/factor_graph.py` |
+| h | `TentativeLandmark.is_confirmed` | `src/graphslam/landmark_manager.py` |
+
+Each part has its own tests, selected by a marker named after the part:
 
 ```sh
-pytest                   # everything
-pytest -k jacobian -x
+pytest -m b              # the tests for (b)
+pytest -m c2 -x          # (c2), stop at the first failure
+pytest                   # everything, including the end-to-end tests
 ```
 
 Nothing else needs changing. `slam.py`, `data_association.py`, the loaders, the
@@ -88,8 +91,8 @@ data/             simulated and Victoria Park data sets
 docs/             INSTALL.md (setup) and GTSAM.md (the GTSAM calls you need)
 src/graphslam/
   preprocessing.py     front-end: odometry and lidar          (a, b)
-  factor_graph.py      factors, measurement model, covariance (c-f, g1)
-  landmark_manager.py  landmark birth, M-of-N                 (g2)
+  factor_graph.py      factors, measurement model, covariance (c-g)
+  landmark_manager.py  landmark birth, M-of-N                 (h)
   data_association.py  JCBB                                   given
   evaluation.py        map quality against the true landmarks given
   slam.py              the main loop                          given

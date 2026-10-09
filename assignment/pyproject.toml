@@ -8,7 +8,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.15"
 dependencies = [
     # 4.3 is the first stable release exposing ISAM2.jointMarginalCovariance,
-    # which is what graphslam.factor_graph.query_joint_covariance calls. Older
+    # which the back-end (graphslam.slam.Backend.joint_covariance) calls. Older
     # releases need a development build; do not relax this bound.
     # Do not add dependencies beyond this list.
     "gtsam>=4.3,<5",
@@ -33,3 +33,18 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--strict-markers"
+# One marker per part of Task 1: `pytest -m c3` runs the tests for (c3).
+markers = [
+    "a: tests for Task 1 (a)",
+    "b: tests for Task 1 (b)",
+    "c1: tests for Task 1 (c1)",
+    "c2: tests for Task 1 (c2)",
+    "c3: tests for Task 1 (c3)",
+    "d: tests for Task 1 (d)",
+    "e: tests for Task 1 (e)",
+    "f: tests for Task 1 (f)",
+    "g: tests for Task 1 (g)",
+    "h: tests for Task 1 (h)",
+    "given: a test in a graded test file that only exercises given code",
+]

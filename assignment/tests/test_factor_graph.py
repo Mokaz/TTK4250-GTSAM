@@ -1,5 +1,5 @@
 """Task 1 (c) graph construction, (d) measurement model, (e) joint
-covariance, (f) innovation covariance and (g1) inverse measurement."""
+covariance, (f) innovation covariance and (g) inverse measurement."""
 
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ from graphslam.utils import ssa
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.c1
 def test_predict_pose_composes_in_the_body_frame() -> None:
     previous = gtsam.Pose2(1.0, 2.0, np.pi / 2)
     increment = gtsam.Pose2(3.0, 0.0, 0.0)
@@ -43,6 +44,7 @@ def test_predict_pose_composes_in_the_body_frame() -> None:
     )
 
 
+@pytest.mark.c1
 def test_predict_pose_is_not_a_component_wise_sum() -> None:
     previous = gtsam.Pose2(0.0, 0.0, 0.7)
     increment = gtsam.Pose2(1.0, 0.0, 0.2)
@@ -58,6 +60,7 @@ def test_predict_pose_is_not_a_component_wise_sum() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.c2
 def test_add_odometry_factor_adds_one_binary_factor() -> None:
     graph = gtsam.NonlinearFactorGraph()
     add_odometry_factor(graph, X(0), X(1), gtsam.Pose2(1.0, 0.0, 0.0), np.eye(3) * 0.01)
@@ -66,6 +69,7 @@ def test_add_odometry_factor_adds_one_binary_factor() -> None:
     assert list(graph.at(0).keys()) == [X(0), X(1)]
 
 
+@pytest.mark.c2
 def test_add_odometry_factor_has_zero_error_at_the_exact_solution() -> None:
     graph = gtsam.NonlinearFactorGraph()
     increment = gtsam.Pose2(1.0, 0.5, 0.3)
@@ -79,6 +83,7 @@ def test_add_odometry_factor_has_zero_error_at_the_exact_solution() -> None:
     assert graph.error(values) == pytest.approx(0.0, abs=1e-12)
 
 
+@pytest.mark.c2
 def test_add_odometry_factor_uses_the_full_covariance() -> None:
     """A correlated covariance must not be flattened to its diagonal.
 
@@ -126,6 +131,7 @@ def _config_with(**noise_overrides) -> SlamConfig:
     return config
 
 
+@pytest.mark.c3
 def test_add_landmark_factor_has_zero_error_at_the_exact_solution() -> None:
     pose = gtsam.Pose2(1.0, 2.0, 0.4)
     landmark = np.array([6.0, 5.0])
@@ -145,6 +151,7 @@ def test_add_landmark_factor_has_zero_error_at_the_exact_solution() -> None:
     assert graph.error(values) == pytest.approx(0.0, abs=1e-12)
 
 
+@pytest.mark.c3
 def test_add_landmark_factor_treats_the_measurement_as_range_then_bearing() -> None:
     """The measurement array is [range, bearing]; the factor wants the reverse.
 
@@ -167,6 +174,7 @@ def test_add_landmark_factor_treats_the_measurement_as_range_then_bearing() -> N
     assert graph.error(values) == pytest.approx(0.0, abs=1e-9)
 
 
+@pytest.mark.c3
 def test_landmark_noise_model_is_ordered_bearing_then_range() -> None:
     config = _config_with(sigma_range=0.5, sigma_bearing_deg=np.rad2deg(0.02))
 
@@ -192,6 +200,7 @@ def test_landmark_noise_model_is_ordered_bearing_then_range() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.d
 def test_predict_measurement_values() -> None:
     pose = gtsam.Pose2(1.0, 2.0, 0.4)
     landmark = np.array([4.0, 6.0])
@@ -206,6 +215,7 @@ def test_predict_measurement_values() -> None:
     assert ssa(z[1] - expected_bearing) == pytest.approx(0.0, abs=1e-12)
 
 
+@pytest.mark.d
 def test_predict_measurement_shapes() -> None:
     z, H_pose, H_landmark = predict_measurement(gtsam.Pose2(0.0, 0.0, 0.0), np.array([3.0, 1.0]))
 
@@ -214,6 +224,7 @@ def test_predict_measurement_shapes() -> None:
     assert H_landmark.shape == (2, 2)
 
 
+@pytest.mark.d
 @pytest.mark.parametrize(
     "pose_values, landmark",
     [
@@ -247,10 +258,11 @@ def test_predict_measurement_jacobians_match_numerical_differentiation(
 
 
 # ---------------------------------------------------------------------------
-# (g1) inverse_measurement
+# (g) inverse_measurement
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.g
 @pytest.mark.parametrize(
     "pose_values, landmark",
     [
@@ -259,11 +271,11 @@ def test_predict_measurement_jacobians_match_numerical_differentiation(
         ((-3.0, 1.5, -1.2), (2.0, -4.0)),
     ],
 )
-def test_inverse_measurement_inverts_predict_measurement(pose_values, landmark) -> None:
+def test_inverse_measurement_recovers_the_landmark(pose_values, landmark) -> None:
     pose = gtsam.Pose2(*pose_values)
     landmark = np.array(landmark)
 
-    z, _, _ = predict_measurement(pose, landmark)
+    z = _exact_measurement(pose, landmark)
     recovered = inverse_measurement(pose, z)
 
     assert np.asarray(recovered).shape == (2,)
@@ -296,6 +308,7 @@ def _labelled_marginal():
     return _LabelledJointMarginal(labels, dims)
 
 
+@pytest.mark.e
 def test_assemble_joint_covariance_puts_the_pose_block_first() -> None:
     P = assemble_joint_covariance(_labelled_marginal(), [X(7), L(3), L(1)])
 
@@ -303,6 +316,7 @@ def test_assemble_joint_covariance_puts_the_pose_block_first() -> None:
     np.testing.assert_allclose(P[0:3, 0:3], 11.0, err_msg="the pose block must come first")
 
 
+@pytest.mark.e
 def test_assemble_joint_covariance_follows_the_order_of_keys() -> None:
     """Block (i, j) is the covariance between keys[i] and keys[j], whatever the order."""
     P = assemble_joint_covariance(_labelled_marginal(), [X(7), L(1), L(3)])
@@ -313,6 +327,7 @@ def test_assemble_joint_covariance_follows_the_order_of_keys() -> None:
     np.testing.assert_allclose(P[3:5, 5:7], 32.0)  # L(1) with L(3)
 
 
+@pytest.mark.e
 def test_assemble_joint_covariance_keeps_the_landmark_cross_blocks() -> None:
     """The landmark-landmark blocks are what makes JCBB joint; they must not be zero."""
     P = assemble_joint_covariance(_labelled_marginal(), [X(7), L(3), L(1)])
@@ -363,6 +378,7 @@ def _small_isam2_problem() -> tuple[gtsam.ISAM2, gtsam.NonlinearFactorGraph, gts
     return isam2, graph, isam2.calculateEstimate()
 
 
+@pytest.mark.e
 @pytest.mark.parametrize("route", ["bayes_tree", "marginals"])
 def test_assemble_joint_covariance_matches_gtsam_block_by_block(route: str) -> None:
     """With a real gtsam.JointMarginal from either GTSAM route.
@@ -399,6 +415,7 @@ def test_assemble_joint_covariance_matches_gtsam_block_by_block(route: str) -> N
             )
 
 
+@pytest.mark.e
 @pytest.mark.parametrize(("solver", "method"), [("isam2", "bayes_tree"), ("isam2", "marginals"), ("batch", "bayes_tree")])
 def test_the_back_end_returns_P_with_the_pose_block_first(solver: str, method: str) -> None:
     """The given back-end, end to end: GTSAM's query plus your assembly.
@@ -429,6 +446,7 @@ def test_the_back_end_returns_P_with_the_pose_block_first(solver: str, method: s
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.f
 def test_innovation_covariance_single_landmark() -> None:
     H_pose = np.array([[1.0, 0.0, 0.5], [0.0, 1.0, -0.2]])
     H_landmark = np.array([[-1.0, 0.0], [0.0, -1.0]])
@@ -444,6 +462,7 @@ def test_innovation_covariance_single_landmark() -> None:
     np.testing.assert_allclose(S, H @ P @ H.T + R, atol=1e-12)
 
 
+@pytest.mark.f
 def test_innovation_covariance_shape_and_noise_term() -> None:
     n = 3
     rng = np.random.default_rng(2)
@@ -460,6 +479,7 @@ def test_innovation_covariance_shape_and_noise_term() -> None:
     np.testing.assert_allclose(S, np.kron(np.eye(n), R), atol=1e-12)
 
 
+@pytest.mark.f
 def test_innovation_covariance_is_block_diagonal_only_without_pose_uncertainty() -> None:
     """Shared pose uncertainty is what correlates the innovations.
 
@@ -484,6 +504,7 @@ def test_innovation_covariance_is_block_diagonal_only_without_pose_uncertainty()
     assert np.abs(S_correlated[0:2, 2:4]).max() > 1e-6
 
 
+@pytest.mark.f
 def test_innovation_covariance_handles_an_empty_local_map() -> None:
     S = innovation_covariance([], [], np.zeros((3, 3)), np.eye(2))
     assert S.shape == (0, 0)
