@@ -3,11 +3,11 @@
 Both of these are quick to run and belong in the report as a figure and a paragraph each. Use whichever data set makes the point most clearly.
 
 \begin{parts}
-    \part \textbf{Relinearization.} iSAM2 does not relinearize everything at every step; it relinearizes the variables whose estimates have moved enough to warrant it. The two knobs are \pythoninline{backend.relinearize_threshold} and \pythoninline{backend.relinearize_skip}.
+    \part \textbf{Relinearization.} iSAM2 does not relinearize everything at every step; it relinearizes the variables whose estimates have moved enough to warrant it. Two knobs control this: \pythoninline{backend.relinearize_threshold}, how far an estimate must move, and \pythoninline{backend.relinearize_skip}, how many steps pass between checks.
 
     Push both to extremes and report what happens to accuracy, consistency and runtime. Relate your results to Sec.\ 9.5.1, which explains why ISAM had to linearize as seldom as possible and why being able to restrict relinearization to the affected variables is what makes ISAM2 worthwhile.
 
-    \part \textbf{One bad association.} Set \pythoninline{association.alpha_individual} loose enough that the front-end starts making mistakes, or force a wrong association by hand, and show what a single wrong loop closure does to the map.
+    \part \textbf{One bad association.} Loosening the gates does not make JCBB err on these data sets, so force a mistake instead: \pythoninline{association.inject_wrong_at_step} re-pairs one measurement with the wrong landmark at that scan step (600 works well on the simulated data, 1500 on Victoria Park). Show what this single wrong association does to the map.
 
     Then set \pythoninline{backend.robust_kernel: huber} and run the same thing again. Explain what the robust kernel does to the cost function (9.6), why that helps, and what it costs you when the associations are in fact all correct.
 

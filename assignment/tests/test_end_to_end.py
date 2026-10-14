@@ -22,6 +22,15 @@ from graphslam.paths import simulated_data_file
 ROOT = Path(__file__).resolve().parents[1]
 STEPS = 80
 
+# The simulated data set's real noise, measured against its ground truth.
+TRUE_NOISE = {
+    "sigma_odom_x": 0.05,
+    "sigma_odom_y": 0.05,
+    "sigma_odom_yaw_deg": 1.0,
+    "sigma_range": 0.05,
+    "sigma_bearing_deg": 1.0,
+}
+
 try:
     SIMULATED: Path | None = simulated_data_file()
 except FileNotFoundError:
@@ -78,18 +87,19 @@ def test_pipeline_runs_and_tracks_the_trajectory(tmp_path: Path) -> None:
     assert _position_rmse(poses, poses_gt) < 2.0
 
 
-def test_the_baseline_map_has_no_duplicate_or_spurious_landmarks(tmp_path: Path) -> None:
+def test_with_the_true_noise_the_map_has_no_duplicate_or_spurious_landmarks(tmp_path: Path) -> None:
     """Every true landmark seen should end up in the map exactly once.
 
-    With the shipped tuning, association does not fail on this data set. A
-    duplicate or a spurious landmark here means a measurement was not matched to
-    the landmark it came from -- usually because the innovation covariance from
-    Task 1 (e) or (f), or the measurement model from (d), is wrong.
+    With the data set's true noise (odometry 0.05 m, 0.05 m, 1 deg; range
+    0.05 m, bearing 1 deg), association does not fail. A duplicate or a
+    spurious landmark here means a measurement was not matched to the landmark
+    it came from -- usually because the innovation covariance from Task 1 (e) or
+    (f), or the measurement model from (d), is wrong.
     """
     from graphslam.evaluation import map_quality
     from graphslam.loaders.simulated import SimulatedDataLoader
 
-    snapshot, _ = _run(tmp_path)
+    snapshot, _ = _run(tmp_path, noise=TRUE_NOISE)
     dataset = SimulatedDataLoader(SIMULATED)
     quality = map_quality(
         snapshot["landmarks"],

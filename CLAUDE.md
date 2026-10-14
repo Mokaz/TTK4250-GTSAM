@@ -138,7 +138,7 @@ guards the whole path for every route.
 
 ## Testing
 
-90 tests, ~8 s. The suite is also the grading instrument, so a test's failure
+95 tests, ~10 s. The suite is also the grading instrument, so a test's failure
 message is student-facing: write them that way.
 
 Every test of a graded function carries one pytest marker named after its part
@@ -151,8 +151,8 @@ another graded function. Given-code tests in the graded files are marked
 catches typos.
 
 Run the handout through the suite after any change to the solution blocks — the
-expected result is that only the tests touching given code pass, currently 31
-of 90. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
+expected result is that only the tests touching given code pass, currently 35
+of 95. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
 check that no graded work hides behind a given-code test, not a scoring floor.
 
 `tests/test_plotting.py` exists because every other test runs with
@@ -162,7 +162,28 @@ and only explodes after a finished multi-minute run. Keep that covered.
 ## Measured
 
 Victoria Park, 2000 steps, after the block-order fix: 141 landmarks, 1.5 m RMS
-from GNSS (GNSS ANIS 1.07 with the 1 m sigma), landmark ANIS 0.27.
+from GNSS (GNSS ANIS 2.14, expected 2, 95% interval [1.89, 2.12] with the 1 m
+sigma; 1.07 per DOF), landmark ANIS 0.27 per DOF (interval [0.93, 1.07]).
+
+**Metric scales (decided 9 Oct).** The book's scale, (4.67): pose ANEES is the
+mean NEES (expected 3), GNSS ANIS the mean NIS (expected 2), each with the
+interval chi2inv(0.025/0.975, N d)/N. The landmark NIS has a varying dimension
+(2 per associated landmark), so it is averaged per DOF (expected 1, interval
+chi2inv(., D)/D) -- (4.67) with mixed dimensions. Every per-step bound and
+interval is 95% (`evaluation.CONFIDENCE`); the NEES and GNSS figures used 90%
+before. Older numbers in this file (ANEES 0.68, GNSS ANIS 1.07) were quoted per
+DOF. The run summary (`graphslam.evaluation.RunSummary`, printed after every
+run and by `plot_run`, stored under `"summary"` in metadata.json) prints each
+average with its expected value and interval. Figures and summary share one
+implementation in `evaluation.py`, and
+`test_a_run_stores_its_summary_and_it_matches_the_figures` keeps them together.
+Sim baseline (shipped 9 Oct, deterministic): 72 of 78 mapped, 6 missed, 0
+duplicates, 3 spurious, RMSE x 0.72 m, y 0.80 m, yaw 1.18 deg, ANEES 8.37
+[2.85, 3.15], landmark ANIS 0.33 [0.98, 1.02]. Task 2 quotes 72 of 78, 3
+spurious and ANEES 8.37 as the Task 1 check; update it if the baseline moves.
+Task 2 now warns that (4.67) assumes independent terms, which a smoother's pose
+errors are not, so the ANEES interval is too narrow; the same holds for the
+time-clustered GNSS NIS.
 
 Absolute timings vary a lot with machine load: the same pre-fix code took 22 s
 in one session and 42 s in another. Compare back to back only. On 1 Oct, back to
@@ -173,10 +194,15 @@ association 7.3 / local-map extraction 4.7), pre-fix 40 s. Per-step median
 Full run (6 Oct, quiet machine; the data set has 7247 scan steps, so
 `--steps 7300` is simply "all of it"). Back to back with a 20.6 s 2000-step run:
 
-| Tuning | Run time | Landmarks | RMS vs GNSS | GNSS ANIS (1 m) | Landmark ANIS |
+| Tuning | Run time | Landmarks | RMS vs GNSS | GNSS ANIS (1 m, exp. 2) | Landmark ANIS (per DOF) |
 |---|---|---|---|---|---|
-| `real_default.yaml` | 146 s | 288 | 1.79 m | 1.36 | 0.26 |
-| odometry 0.1 m / 0.3° | 291 s | 1282 | 218 m | ~2e4 | 0.49 |
+| `real_default.yaml` | 146 s | 288 | 1.79 m | 2.73 | 0.26 |
+| odometry 0.1 m / 0.3° | 291 s | 1282 | 218 m | ~4e4 | 0.48 |
+
+Re-run 9 Oct after the `max_range` / `range_local` split (55 m local map):
+identical landmarks, RMS and ANIS for 2000 steps and both full runs, so the
+margin changes no association on this data. Run times that day were inflated
+by load (39 s / 203 s / 673 s); the table keeps the quiet-machine times.
 
 Steps 5000–7000 cost about 3x the earlier ones (revisits, bigger cliques):
 per-step median 13.7 ms, 95th percentile 61 ms, max 88 ms. The lowered-noise
@@ -185,12 +211,34 @@ run is the one Task 3 asks for; it diverges completely and takes twice as long.
 ## Known gaps and open decisions
 
 - **Tuning intent for `real_default.yaml` (decided 2 Oct).** The shipped values
-  are a working baseline, deliberately not consistent: GNSS-consistent (ANIS
-  1.07, 1.5 m RMS) but locally conservative (landmark ANIS 0.27). Lowering
-  odometry noise pushes landmark ANIS towards 1 but breaks the run (370–470
-  landmarks, 35–70 m from GNSS), because independent-increment odometry cannot
-  be right both per step and over a loop. Task 3 now says so and asks for one
-  tuning set that lowers the odometry noise. Do not "fix" the tuning.
+  are a working baseline, deliberately not consistent: roughly consistent with
+  GNSS (ANIS 2.14 against an expected 2, just above its narrow 95% interval
+  [1.89, 2.12]; 1.5 m RMS) but locally conservative (landmark ANIS 0.27 per
+  DOF). Lowering odometry noise pushes landmark ANIS towards 1 but breaks the
+  run (every set with odometry translation 0.2 m or less broke in the 9 Oct
+  search), because independent-increment odometry cannot be right both per step
+  and over a loop. Task 3 asks for one tuning set that lowers the odometry
+  noise. **Corrected 9 Oct:** the landmark NIS *can* reach 1 the other way,
+  trusting the lidar more and the odometry less: odometry 0.5 m with R 0.1 m /
+  0.1 deg gives ANIS 1.05 and 1.49 m at 2000 steps, and 0.98 / 3.94 m / 389
+  landmarks over the full run (baseline 0.26 / 1.79 m / 288). A tight R with
+  the baseline's 0.3 m odometry breaks (55 m). So the low NIS is mostly a too
+  large R, and Q must stay large because wheel errors are correlated. Task 3's
+  text still fits; the solving guide has the table.
+- **Task 4(b) uses `association.inject_wrong_at_step` (decided 14 Oct).**
+  Loosening the gates produces no mistake on either data set (checked up to
+  1 - 1e-12), so the text now has students force one: at that scan step,
+  `data_association.force_wrong_association` re-pairs the first associated
+  measurement with the unused local landmark whose predicted bearing is
+  furthest from it (bearing difference wrapped), and `run_slam` prints a line
+  saying so, or that there was nothing to re-pair. Students no longer edit
+  `slam.py`. Measured 14 Oct through the option: sim with the true noise,
+  step 600 -> 13.9 m, 61 spurious; with Huber 0.41 m (no cost on a clean run).
+  Shipped sim baseline, step 600 -> 6.82 m, 73 spurious. Victoria Park, step
+  1500 -> 4.59 m; Huber k 5 fixes it (1.50 m); Huber k 1.345 / 3 break a clean
+  run (25 / 22 m). (An earlier wrapper without the bearing wrap picked a
+  different landmark and barely moved the baseline: 1.08 -> 1.11 m.) Do not "fix" the shipped
+  tuning: finding this is the task.
 - **Pass/fail (decided 2 Oct).** The number of tests passed is not a score;
   it feeds an overall evaluation of the submission together with the report.
   `ga2_graded2.tex` and `ga2_task01_implement.tex` say so. The text talks about
@@ -200,7 +248,9 @@ run is the one Task 3 asks for; it diverges completely and takes twice as long.
   unless a patched build fills it in.
 - No `--steps` limit is needed for Task 3 (see Measured). Task 3 has a "Plan
   your runs" paragraph: explore with `--steps 2000`, report only full runs
-  (the runtime plot's expensive regime starts after scan 5000). Its numbers
+  (the revisits after scan 5000 are where tunings differ). The runtime plot
+  was dropped from Task 3 on 9 Oct to keep the assignment no longer than the
+  EKF-SLAM one. Its numbers
   (2.5 min, ~140 landmarks at 2000, 20 s) come from the Measured section;
   update both together.
 - `Car.a` / `Car.b` (lidar offset) parsed but unused. Backlogged (2 Oct) as a
@@ -245,8 +295,60 @@ run is the one Task 3 asks for; it diverges completely and takes twice as long.
   permanent duplicate. M 1, N 1 is only safe while S is conservative.
   Ctrl+C now saves the run so far, marked `aborted` in metadata.json;
   `--no-save-on-abort` on run_sim/run_real turns that off (7 Oct).
-- Simulated data's true noise: range sd 0.05 m, bearing sd 0.99 deg. The
-  shipped `sigma_range` 0.2 is why Task 2's landmark ANIS is 0.65.
+- **Simulated data's true noise (measured 9 Oct against ground truth):**
+  odometry 0.05 m, 0.05 m, 1.0 deg per step; measurements range 0.05 m,
+  bearing 0.99 deg; all white and uncorrelated.
+- **Tight initial-pose prior on the sim (decided 9 Oct).** The simulated run
+  starts exactly at the true pose; the old prior (0.1 m, 0.1 deg) inflated
+  every pose covariance and hid the too-small odometry noise, so the baseline's
+  ANEES read 2.05 ("somewhat conservative"). `sim_default.yaml` now ships
+  0.001 m / 0.001 deg, not marked `TODO tune` (Martin: no more tuning values).
+  Victoria Park keeps its loose prior: its start is genuinely unknown in the
+  GNSS frame.
+- **Resolved: the true Q and R give ANEES 1.91 on the data set, and that is
+  chance (9 Oct).** Monte Carlo: 72 fresh noise draws of the true size around
+  the same true trajectory, run through the full pipeline with the true noise:
+  ANEES mean 3.71 +- 0.34, median 2.89, 5-95% [1.37, 8.42]; 22% of draws fall
+  below 1.91. Landmark ANIS 1.000 within +-0.02 on every draw. Dead reckoning
+  alone with the true Q: mean 3.02 over 300 draws, 5-95% [1.07, 6.51]. One
+  smoothed trajectory's errors are so correlated that its ANEES barely
+  averages; the (4.67) interval is far too narrow for it. Task 2 now says one
+  run's ANEES can land anywhere from about 1.5 to 8 with the correct noise.
+  Scripts were scratch (redraw odometry as true increment composed with
+  Expmap(noise), measurements as h(true pose, nearest true landmark) + noise).
+- **Best sim tuning found (search over 112 settings, 9 Oct):** true Q and R
+  plus M 1, N 1: 78 of 78 mapped, 0 duplicates, 0.36 m / 0.42 deg RMSE, ANIS
+  0.99, ANEES 2.42. M 1, N 1 is safe here because S is right in both Q and R.
+  Every sensible set lands at 0.35-0.45 m; lower numbers come with duplicates
+  or a bad ANEES (luck on one data set). Heading noise matters most; strict
+  birth (M 3, N 4) loses 13 landmarks even with the true noise. Gates: alpha
+  is a confidence, so raising it towards 1 *loosens* the gate. Loosening (up to
+  1 - 1e-12) changes nothing on either data set; tightening (0.999 / 0.99)
+  changes nothing on the sim but breaks Victoria Park (248 landmarks, 26 m).
+- **The local map is not a tuning value (decided 9 Oct).** `range_local` and
+  `bearing_local_deg` lost their `TODO tune`: they come from the sensor (sim
+  80 m, +-90 deg; Victoria Park 50 m, about +-87 deg) plus a margin. Smaller
+  hides visible landmarks from association and makes duplicates (sim
+  `range_local` 60 and 40 hang). On Victoria Park, tree extraction used
+  `range_local` as its cut-off, leaving no margin; it now has its own
+  `sensor.max_range` (50 m) and `range_local` is 55 m.
+  `test_victoria_park_extracts_trees_out_to_max_range_not_range_local` guards
+  the split.
+- **Sim baseline made deliberately worse (decided 9 Oct).** Martin found the
+  old baseline (0.39 m) too close to the best (0.36 m) for students to see an
+  improvement. `sim_default.yaml` now has heading noise 0.5 deg (true 1.0) and
+  bearing 2.0 deg (true 1.0) on top of the odometry translation 0.01 m (true
+  0.05) and range 0.2 m (true 0.05): every noise value wrong in a known
+  direction. Fixing the heading alone halves the error (0.53 m), heading and
+  bearing gives 0.39 m, the true noise 0.41 m with ANIS 1.00, the best set
+  0.36 m. A working baseline is still how a student checks Task 1, so Task 2
+  quotes the deterministic output. `test_with_the_true_noise_the_map_has_no_
+  duplicate_or_spurious_landmarks` no longer uses the shipped tuning.
+- **Dead tuning knobs removed (9 Oct).** `sigma_velocity` and `sigma_steer_deg`
+  were marked `TODO tune` in both configs but never used (only `sigma_odom_*`
+  feeds the odometry covariance). Removed from `NoiseConfig` and the configs.
+  Old run directories whose `config.yaml` still has them no longer load in
+  `plot_run`.
 
 ## Working style for this repo
 

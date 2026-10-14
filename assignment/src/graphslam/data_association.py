@@ -179,6 +179,33 @@ def num_associations(array: np.ndarray) -> int:
     return int(np.count_nonzero(array > -1))
 
 
+def force_wrong_association(
+    association: np.ndarray,
+    measurements: np.ndarray,
+    predicted_measurements: np.ndarray,
+) -> np.ndarray:
+    """Re-pair one associated measurement with the wrong landmark, for Task 4(b).
+
+    The first associated measurement is paired with the local landmark whose
+    predicted bearing is furthest from it, among those no other measurement
+    uses: a deliberate, gross association error. The association is returned
+    unchanged if nothing is associated, or if no unused landmark is left.
+    """
+    association = np.array(association, copy=True)
+    associated = np.flatnonzero(association >= 0)
+    if associated.size == 0:
+        return association
+
+    i = int(associated[0])
+    used = set(association[associated].tolist())
+    bearing_gap = np.abs(ssa(predicted_measurements[:, 1] - measurements[i, 1]))
+    for j in np.argsort(-bearing_gap):
+        if int(j) not in used:
+            association[i] = int(j)
+            break
+    return association
+
+
 def get_associator(config: SlamConfig):
     """Return a callable ``(measurements, local_map, S) -> association``."""
     if config.association.method != "jcbb":

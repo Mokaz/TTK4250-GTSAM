@@ -5,9 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from graphslam.config import SlamConfig
-from graphslam.evaluation import map_quality
 from graphslam.loaders.simulated import SimulatedDataLoader
-from graphslam.logger import SlamLogger
 from graphslam.slam import run_slam
 
 
@@ -29,18 +27,6 @@ def run_sim(
         save_plots=save_plots,
         save_on_abort=save_on_abort,
     )
-    report_map_quality(dataset, output_dir)
-
-
-def report_map_quality(dataset: SimulatedDataLoader, output_dir: Path) -> None:
-    """Print how the finished map compares with the true landmarks."""
-    snapshot = SlamLogger.load_snapshot(Path(output_dir) / "snapshots" / "snap_final.npz")
-    quality = map_quality(
-        snapshot["landmarks"],
-        dataset.landmarks_gt,
-        observed=dataset.observed_landmarks(len(snapshot["poses"])),
-    )
-    print(f"Map quality: {quality}")
 
 
 def parse_args() -> argparse.Namespace:

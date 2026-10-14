@@ -28,7 +28,7 @@ In the same way as previously, we want you to find 3 different sets of tuning va
     \item Watch the number of landmarks. The given tuning ends the first 2000 scans with about 140. Several hundred means data association is failing, and that tuning will only get worse, and slower, over the full run.
     \item Give every run its own \pythoninline{--output-dir}, and re-plot a finished run with \pythoninline{plot_run} instead of running it again.
 \end{itemize}
-All figures and numbers in your report should come from full runs. This matters most for the runtime plot below: the per-step cost roughly triples after scan 5000, when the car revisits earlier parts of the park, and a short run never gets there.
+All figures and numbers in your report should come from full runs: after scan 5000 the car revisits earlier parts of the park, and a short run never gets there.
 
 See the linked webpage and the files in the Victoria Park folder for further information.
 The same reasoning applies to NIS and tuning here as in the simulated dataset.
@@ -37,10 +37,6 @@ Note that you can use the GPS as a sort of ground truth, but it is very much les
 You might want to use a NIS calculation instead of NEES calculation if you do that.
 Some comparison to the GPS is, however, expected.
 The position NIS plot treats each GPS sample as a position measurement with standard deviation \pythoninline{noise.sigma_gnss} (1\,m by default). This value is an assumption about the GPS, not a filter parameter: it never enters the graph, but it sets the scale of that plot, so keep it in mind when you interpret it.
-
-\hfill
-
-In addition, we want a plot of the \emph{per-step runtime}, split into its three components (data association, covariance recovery and optimization), against the number of landmarks in the map. Every run logs these automatically. Discuss which term dominates and why, and connect what you see to Sec.\ 9.3.2, 9.3.3 and 9.5.1 -- reordering, incremental updates, and restricting relinearization are all answers to a cost that this plot makes visible.
 
 \hfill
 

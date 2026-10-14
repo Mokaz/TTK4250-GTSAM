@@ -1,8 +1,6 @@
 # Baseline tuning for the Victoria Park data set.
 # Everything marked "TODO tune" is yours to experiment with in Task 3.
 noise:
-  sigma_velocity: 0.1            # TODO tune
-  sigma_steer_deg: 0.5           # TODO tune
   sigma_odom_x: 0.3              # TODO tune
   sigma_odom_y: 0.3              # TODO tune
   sigma_odom_yaw_deg: 0.6        # TODO tune
@@ -13,8 +11,13 @@ noise:
   sigma_init_pose_yaw_deg: 0.1
   sigma_gnss: 1.0                # assumed GNSS accuracy [m]; never fed to the graph, only scales the GNSS NIS plot
 sensor:
-  range_local: 50.0              # TODO tune
-  bearing_local_deg: 100.0       # TODO tune
+  # Not tuning values. Trees are extracted from each scan out to max_range. The
+  # local map (the landmarks offered to data association) reaches a little
+  # further, so a tree near the limit stays in it when the pose estimate is
+  # slightly off; the laser sees +-90 deg.
+  max_range: 50.0
+  range_local: 55.0
+  bearing_local_deg: 100.0
 tentative:
   M: 3                           # TODO tune: lidar tree detections are noisy
   N: 4                           # TODO tune
@@ -23,6 +26,7 @@ association:
   method: jcbb
   alpha_individual: 0.9999       # TODO tune
   alpha_joint: 0.9999            # TODO tune
+  inject_wrong_at_step: null     # Task 4(b): a scan step, e.g. 600, to force one wrong association there
 backend:
   solver: isam2                  # do not use "batch" on this data set
   relinearize_threshold: 0.1     # TODO tune (Task 4)

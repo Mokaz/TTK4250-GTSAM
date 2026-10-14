@@ -108,6 +108,27 @@ def test_plot_all_writes_every_figure(plotted_run: Path) -> None:
 
 
 @needs_data
+def test_a_run_stores_its_summary_and_it_matches_the_figures(plotted_run: Path) -> None:
+    """The summary printed after a run is computed from the same data as the figures."""
+    import json
+
+    from graphslam.plotter import SlamRunPlotter
+
+    summary = json.loads((plotted_run / "metadata.json").read_text())["summary"]
+    for key in ("rmse_x_m", "pose_anees", "landmark_anis_per_dof", "map_quality"):
+        assert summary.get(key) is not None, f"metadata.json summary is missing {key}"
+
+    plotter = SlamRunPlotter.from_run(plotted_run)
+    assert plotter.summary().as_dict() == summary, "summary() disagrees with what the run stored"
+
+    _, ax = plotter.plot_pose_nees()
+    nees_text = ax.texts[0].get_text()
+    assert f"ANEES = {summary['pose_anees']:.2f}" in nees_text, (
+        f"the NEES figure says {nees_text!r}, the summary {summary['pose_anees']:.2f}"
+    )
+
+
+@needs_data
 def test_position_nis_plot_runs(plotted_run: Path) -> None:
     """The one plot the simulated set cannot reach on its own.
 

@@ -5,9 +5,17 @@ import numpy as np
 from matplotlib.patches import Ellipse
 from scipy.stats import chi2, spearmanr
 
-from graphslam.data_association import NIS
+from graphslam.evaluation import (
+    CONFIDENCE,
+    average_interval,
+    chi2_bounds,
+    gnss_nis,
+    landmark_nis,
+    pose_errors,
+    pose_nees,
+)
 from graphslam.plotting.thesis_style import thesis_figsize
-from graphslam.utils import rotmat2, ssa
+from graphslam.utils import pose2_tangent_errors, rotmat2
 
 
 def _ensure_ax(
@@ -53,17 +61,6 @@ def draw_landmark_covariances(ax, landmarks: np.ndarray, landmarks_cov: np.ndarr
             confidence_ellipse_2d(lm, cov, fc="tomato", alpha=alpha, ec="tomato", **kwargs)
         )
 
-
-def pose2_tangent_errors(poses: np.ndarray, poses_gt: np.ndarray) -> np.ndarray:
-    """Return Logmap(T_est.between(T_gt)) for aligned Pose2 arrays."""
-    import gtsam
-
-    errors = np.zeros_like(poses, dtype=float)
-    for i, (pose, pose_gt) in enumerate(zip(poses, poses_gt)):
-        T = gtsam.Pose2(*pose)
-        T_gt = gtsam.Pose2(*pose_gt)
-        errors[i, :] = gtsam.Pose2.Logmap(T.between(T_gt))
-    return errors
 
 def plot_estimate(
     poses: np.ndarray | None = None,
@@ -476,8 +473,7 @@ def plot_pose_diagnostics(
         if cov_frame == "body":
             error = pose2_tangent_errors(poses, poses_gt)
         else:
-            error = poses - poses_gt
-            error[:, 2] = ssa(error[:, 2])
+            error = pose_errors(poses, poses_gt)
         
         x_error = error[:, 0]
         y_error = error[:, 1]
@@ -560,24 +556,27 @@ def plot_pose_nees(
 
     poses_gt = poses_gt[:n]
 
-    poses_error = pose2_tangent_errors(poses, poses_gt)
-
-    nees = np.einsum("ij,ijk,ik->i", poses_error, np.linalg.inv(poses_covs), poses_error)
+    nees = pose_nees(poses, poses_gt, poses_covs)
     anees = np.sum(nees) / n
 
-    upper_bound = chi2.ppf(0.95, 3) 
-    lower_bound = chi2.ppf(0.05, 3)
+    lower_bound, upper_bound = chi2_bounds(3)
+    anees_lower, anees_upper = average_interval(3 * n, n)
     inlier_mask = (nees >= lower_bound) & (nees <= upper_bound)
-    inlier_pct = 100.0 * np.mean(inlier_mask) 
+    inlier_pct = 100.0 * np.mean(inlier_mask)
 
-    ax.plot(nees, color="steelblue", label=f"NEES (ANEES={anees:.2f})")
-    ax.axhline(lower_bound, ls="--", c="tomato", label=r"$\chi^2_{3,0.95}$")
-    ax.axhline(upper_bound, ls="--", c="orange", label=r"$\chi^2_{3,0.05}$")
+    ax.plot(nees, color="steelblue", label="NEES")
+    ax.axhline(lower_bound, ls="--", c="orange", label=rf"$\chi^2_3$ lower {CONFIDENCE:.0%} bound")
+    ax.axhline(upper_bound, ls="--", c="tomato", label=rf"$\chi^2_3$ upper {CONFIDENCE:.0%} bound")
+    anees_text = (
+        f"ANEES = {anees:.2f} (expected 3)\n"
+        f"{CONFIDENCE:.0%} interval: [{anees_lower:.2f}, {anees_upper:.2f}]"
+    )
+    ax.text(0.98, 0.95, anees_text, transform=ax.transAxes, ha="right", va="top", fontsize=8, bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
     ax.set_xlabel("Scan step")
     ax.set_ylabel("NEES")
-    ax.set_title(f"Pose NEES (Inliers: {inlier_pct:.1f}%)")
+    ax.set_title(f"Pose NEES ({inlier_pct:.1f}% inside the {CONFIDENCE:.0%} bounds)")
     ax.grid(True, lw=0.4)
-    ax.legend(loc="upper center", ncol=3, frameon=True)
+    ax.legend(loc="upper left", fontsize=8)
 
     return fig, ax
 
@@ -601,66 +600,27 @@ def plot_position_nis(
     else:
         fig = ax.figure
 
-    poses = poses
-    poses_covs = poses_covs
- 
-    pose_xy = poses[:, :2]
-    covs_xy = poses_covs[:, :2, :2]
-    covs_xy = rotmat2(poses[:, 2]) @ covs_xy @ rotmat2(poses[:, 2]).transpose((0, 2, 1))  # Rotate to world frame
-
-    if len(poses_times) != len(pose_xy):
-        raise ValueError("pose_times must have the same length as poses.")
-    if len(poses_times) == 0:
-        raise ValueError("At least one pose is required.")
-    if len(gnss) == 0:
-        raise ValueError("At least one GNSS measurement is required.")
-
-    # A run cut short with --steps ends long before the GNSS log does. Samples
-    # outside the run's time span would all be matched to its first or last pose
-    # and show up as a huge, meaningless NIS, so leave them out.
-    in_run = (gnss[:, 0] >= poses_times[0]) & (gnss[:, 0] <= poses_times[-1])
-    gnss = gnss[in_run]
-    if len(gnss) == 0:
-        raise ValueError("No GNSS measurement falls inside the time span of the run.")
-
-    nearest_pose_indices = nearest_indices(gnss[:, 0], poses_times)
-    pose_xy = pose_xy[nearest_pose_indices]
-    innovation_covs_xy = covs_xy[nearest_pose_indices] + np.eye(2) * sigma_gnss**2
-
-    innovation_xy = pose_xy - gnss[:, 1:3]
-    nis_xy = np.einsum("ij,ijk,ik->i", innovation_xy, np.linalg.inv(innovation_covs_xy), innovation_xy)
+    nis_xy, nearest_pose_indices, _ = gnss_nis(gnss, poses, poses_covs, poses_times, sigma_gnss)
     anis_xy = np.sum(nis_xy) / len(nis_xy)
 
-    nis_lower = chi2.isf(1-0.05, 2)
-    nis_upper = chi2.isf(1-0.95, 2)
+    nis_lower, nis_upper = chi2_bounds(2)
+    anis_lower, anis_upper = average_interval(2 * len(nis_xy), len(nis_xy))
     inliers = np.count_nonzero((nis_xy >= nis_lower) & (nis_xy <= nis_upper))
     inlier_frac = inliers / len(nis_xy)
 
     ax.scatter(nearest_pose_indices, nis_xy, s=5, color="steelblue", label=r"$\mathrm{NIS}_{xy}$")
-    ax.axhline(nis_upper, ls="--", c="tomato", lw=1, label=r"$\chi^2_{2,0.95}$")
-    ax.axhline(nis_lower, ls="--", c="orange", lw=1, label=r"$\chi^2_{2,0.05}$")
+    ax.axhline(nis_upper, ls="--", c="tomato", lw=1, label=rf"$\chi^2_2$ upper {CONFIDENCE:.0%} bound")
+    ax.axhline(nis_lower, ls="--", c="orange", lw=1, label=rf"$\chi^2_2$ lower {CONFIDENCE:.0%} bound")
     ax.set_xlabel("Scan step")
     ax.set_ylabel(r"NIS")
     ax.set_title(
-        f"NIS-position | ANIS = {anis_xy:.2f} | inliers = {inlier_frac:.0%}"
-        f" | GNSS sigma = {sigma_gnss:g} m"
+        f"NIS-position | ANIS = {anis_xy:.2f}, {CONFIDENCE:.0%} interval [{anis_lower:.2f}, {anis_upper:.2f}]"
+        f" | {inlier_frac:.0%} inside bounds | GNSS sigma = {sigma_gnss:g} m"
     )
     ax.grid(True, lw=0.4)
     ax.legend()
 
     return fig, ax
-
-def nearest_indices(query_times: np.ndarray, reference_times: np.ndarray) -> np.ndarray:
-    """Return index of the nearest reference time for each query time."""
-    insertion_indices = np.searchsorted(reference_times, query_times)
-    right_indices = np.clip(insertion_indices, 0, len(reference_times) - 1)
-    left_indices = np.clip(insertion_indices - 1, 0, len(reference_times) - 1)
-
-    left_dt = np.abs(query_times - reference_times[left_indices])
-    right_dt = np.abs(query_times - reference_times[right_indices])
-
-    return np.where(left_dt <= right_dt, left_indices, right_indices)
-
 
 def plot_association(
     diagnostics: dict[str, np.ndarray],
@@ -760,41 +720,19 @@ def plot_landmark_nis(
 
     fig, ax = _ensure_ax(ax, figsize=(8, 3))
 
-    num_steps = len(diagnostics)
-
-    nis = np.empty(num_steps, dtype=float)
-    dofs = np.empty(num_steps, dtype=int)
-    steps = np.empty(num_steps, dtype=int)
-
-    for i, step_diag in enumerate(diagnostics):
-        step   = step_diag.get("scan_step")[0]
-        z      = step_diag.get("measurements")
-        z_pred = step_diag.get("predicted_measurements")
-        assoc  = step_diag.get("association")
-        S      = step_diag.get("innovation_covariance")
-
-        nis[i] = NIS(z, z_pred, S, assoc)
-        dofs[i] = 2 * np.sum(assoc >= 0)
-        steps[i] = step
-
-    # Remove scans with no associated range-bearing measurements
-    valid = dofs > 0
-    nis = nis[valid]
-    dofs = dofs[valid]
-    steps = steps[valid]
+    nis, dofs, steps = landmark_nis(diagnostics)
 
     # Per-step NIS per degree of freedom
     nis_per_dof = nis / dofs
 
-    nis_lower = chi2.ppf(0.025, dofs) / dofs
-    nis_upper = chi2.ppf(0.975, dofs) / dofs
+    nis_lower, nis_upper = chi2_bounds(dofs)
+    nis_lower, nis_upper = nis_lower / dofs, nis_upper / dofs
 
     # Aggregate NIS per degree of freedom
-    D = np.sum(dofs)
+    D = int(np.sum(dofs))
     anis_per_dof = np.sum(nis) / D
 
-    anis_lower = chi2.ppf(0.025, D) / D
-    anis_upper = chi2.ppf(0.975, D) / D
+    anis_lower, anis_upper = average_interval(D, D)
 
     ax.plot(steps, nis_per_dof, lw=1.2, color="steelblue", label=r"$\bar{\epsilon}_{k,\mathrm{lm}}$")
     ax.axhline(1.0, lw=1.0, ls=":", color="tomato", label=r"$\mathbb{E}[\bar{\epsilon}_{k,\mathrm{lm}}]=1$")

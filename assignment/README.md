@@ -43,8 +43,9 @@ run_sim --config configs/sim_default.yaml --steps 1000 --output-dir runs/sim/exa
 plot_run runs/sim/example    # re-plot a finished run
 ```
 
-With the environment active. Add `--no-show-plots` to skip the interactive
-windows; figures are written to the run directory either way.
+With the environment active. A run ends by opening its figures, and the
+command returns once you close the windows. Add `--no-show-plots` to skip them
+(for example over SSH); figures are written to the run directory either way.
 
 Ctrl+C stops a run and still saves it up to the last completed step, marked as
 aborted, so you can plot it with `plot_run`. Add `--no-save-on-abort` if you
@@ -136,10 +137,30 @@ means.** Start there; the assignment text names the calls each part needs.
 GTSAM's own documentation (https://gtsam.org) is written for C++ and rarely
 needed.
 
+## Reading a run
+
+Every run prints a summary as soon as it is saved, before any figure opens.
+`plot_run` prints it too, and it is stored under `"summary"` in the run's
+`metadata.json`, so runs can be compared without plotting them:
+
+```text
+Map quality: 72 of 78 observed true landmarks mapped, 6 missed, 0 duplicates, 3 spurious, RMS position error 1.89 m
+Summary: RMSE x 0.72 m, y 0.80 m, yaw 1.18 deg | pose ANEES 8.37 (expected 3, 95% interval [2.85, 3.15]) | landmark ANIS 0.33 per DOF (expected 1, 95% interval [0.98, 1.02])
+```
+
+The numbers are the ones the figures show. The averages follow the book's
+(4.67): the pose ANEES is the mean NEES (expected 3, the pose dimension) and on
+Victoria Park the GNSS ANIS is the mean NIS (expected 2). The landmark NIS of a
+scan has two degrees of freedom per associated landmark, which changes from
+scan to scan, so it is averaged per degree of freedom instead (expected 1).
+Every average comes with its 95% interval, and every per-step bound in the
+figures is a 95% bound. The map-quality line needs ground truth, so it only
+appears on the simulated set.
+
 ## Debugging
 
-On the simulated set, every run ends with a map-quality line, also shown in the
-title of `final_snapshot.pdf` and printed by `plot_run`:
+On the simulated set, the map-quality line (also in the title of
+`final_snapshot.pdf`) is the first thing to look at:
 
 ```text
 Map quality: 78 of 78 observed true landmarks mapped, 0 missed, 0 duplicates, 0 spurious

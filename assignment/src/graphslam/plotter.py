@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import os
 from dataclasses import dataclass
 from pathlib import Path
+
+# On Windows, Qt warns that it cannot set the DPI mode when the terminal has
+# already set it ("SetProcessDpiAwarenessContext() failed"). It is harmless.
+os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.window=false")
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +15,16 @@ import numpy as np
 from graphslam.loaders.victoria_park import VictoriaParkLoader
 from graphslam.loaders.simulated import SimulatedDataLoader
 from graphslam.config import SlamConfig
-from graphslam.evaluation import MapQuality, map_quality
+from graphslam.evaluation import (
+    MapQuality,
+    RunSummary,
+    average_interval,
+    gnss_nis,
+    landmark_nis,
+    map_quality,
+    pose_errors,
+    pose_nees,
+)
 from graphslam.logger import SlamLogger
 from graphslam.plotting.plotting_funcs import (
     plot_estimate,
@@ -100,6 +114,52 @@ class SlamRunPlotter:
         return map_quality(
             self.snapshots[-1].get("landmarks"), self.gt_landmarks, self.observed_landmarks
         )
+
+    def summary(self) -> RunSummary:
+        """The run's headline numbers, the same ones its figures show."""
+        poses = self.snapshots[-1].get("poses")
+        poses_covs = self.snapshots[-1].get("poses_covariance")
+        values = {}
+
+        if self.gt_poses is not None:
+            rmse = np.sqrt(np.mean(pose_errors(poses, self.gt_poses) ** 2, axis=0))
+            values.update(
+                rmse_x_m=float(rmse[0]),
+                rmse_y_m=float(rmse[1]),
+                rmse_yaw_deg=float(np.rad2deg(rmse[2])),
+            )
+            nees = pose_nees(poses, self.gt_poses, poses_covs)
+            values.update(
+                pose_anees=float(np.mean(nees)),
+                pose_anees_interval=average_interval(3 * len(nees), len(nees)),
+            )
+
+        if self.association:
+            nis, dofs, _ = landmark_nis(self.association)
+            total_dof = int(dofs.sum())
+            if total_dof > 0:
+                values.update(
+                    landmark_anis_per_dof=float(nis.sum() / total_dof),
+                    landmark_anis_interval=average_interval(total_dof, total_dof),
+                )
+
+        if self.gnss is not None:
+            sigma_gnss = self.config.noise.sigma_gnss
+            try:
+                nis, _, difference = gnss_nis(
+                    self.gnss, poses, poses_covs, self.steps.get("scan_time"), sigma_gnss
+                )
+            except ValueError:  # e.g. a run too short to overlap any GNSS sample
+                pass
+            else:
+                values.update(
+                    gnss_anis=float(np.mean(nis)),
+                    gnss_anis_interval=average_interval(2 * len(nis), len(nis)),
+                    sigma_gnss_m=float(sigma_gnss),
+                    gnss_rms_distance_m=float(np.sqrt(np.mean(np.sum(difference**2, axis=1)))),
+                )
+
+        return RunSummary(map_quality=self.map_quality(), **values)
 
     def plot_final_snapshot(self, ax = None, **kwargs) -> tuple[plt.Figure, plt.Axes]:
         quality = self.map_quality()
@@ -252,7 +312,12 @@ class SlamRunPlotter:
         self._finish_figure( self.plot_landmarks_and_timing(), name="landmarks_and_timing", save=save, show=show, fmt="pdf" )
         self._finish_figure( self.plot_timing_vs_landmarks(), name="timing_vs_landmarks", save=save, show=show, fmt="pdf" )
         self._finish_figure( self.plot_landmark_growth(), name="landmark_growth", save=save, show=show, fmt="pdf" )
-        plt.show()
+        if show and plt.get_fignums():
+            print(
+                f"Showing {len(plt.get_fignums())} figures. Close the windows to finish, "
+                "or run with --no-show-plots to skip them."
+            )
+            plt.show()
 
 
 def main() -> None:
@@ -266,9 +331,7 @@ def main() -> None:
 
     run_dir = args.run_dir
     plotter = SlamRunPlotter.from_run(run_dir)
-    quality = plotter.map_quality()
-    if quality is not None:
-        print(f"Map quality: {quality}")
+    print(plotter.summary())
     plotter.plot_all(save=True, show=args.show)
     
 

@@ -229,6 +229,13 @@ class SlamLogger:
     def load_steps(run_path: Path | str) -> dict[str, np.ndarray]:
         return SlamLogger._load_npz_dict(Path(run_path) / "steps.npz")
 
+    def save_summary(self, summary: dict) -> None:
+        """Add the run's summary (see ``graphslam.evaluation.RunSummary``) to metadata.json."""
+        path = self.run_dir / "metadata.json"
+        metadata = json.loads(path.read_text())
+        metadata["summary"] = summary
+        path.write_text(json.dumps(metadata, indent=2))
+
     @staticmethod
     def load_metadata(run_path: Path | str) -> dict:
         path = Path(run_path) / "metadata.json"

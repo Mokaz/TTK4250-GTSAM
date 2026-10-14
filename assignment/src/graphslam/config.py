@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 from omegaconf import OmegaConf
@@ -33,8 +34,6 @@ class NoiseConfig:
     measurement array in the code use *range before bearing*.
 
     Attributes:
-        sigma_velocity: std. dev. of the wheel-encoder velocity [m/s].
-        sigma_steer_deg: std. dev. of the steering angle [deg].
         sigma_odom_x: std. dev. of additive odometry noise in relative x [m].
         sigma_odom_y: std. dev. of additive odometry noise in relative y [m].
         sigma_odom_yaw_deg: std. dev. of additive odometry noise in yaw [deg].
@@ -47,9 +46,6 @@ class NoiseConfig:
             added to the graph; this only sets the reference uncertainty in the
             position-NIS plot, and with it the vertical scale of that plot.
     """
-
-    sigma_velocity: float = 0.1
-    sigma_steer_deg: float = 0.5
 
     sigma_odom_x: float = 0.1
     sigma_odom_y: float = 0.1
@@ -70,10 +66,6 @@ class NoiseConfig:
                 raise ValueError(f"Noise parameter {field_name} must be > 0, got {value}")
 
     @property
-    def sigma_steer_rad(self) -> float:
-        return np.deg2rad(self.sigma_steer_deg)
-
-    @property
     def sigma_odom_yaw_rad(self) -> float:
         return np.deg2rad(self.sigma_odom_yaw_deg)
 
@@ -84,11 +76,6 @@ class NoiseConfig:
     @property
     def sigma_init_pose_yaw_rad(self) -> float:
         return np.deg2rad(self.sigma_init_pose_yaw_deg)
-
-    @property
-    def control_input_cov_matrix(self) -> np.ndarray:
-        """Covariance of the raw control input [velocity, steering]."""
-        return np.diag([self.sigma_velocity**2, self.sigma_steer_rad**2])
 
     @property
     def odom_cov_matrix(self) -> np.ndarray:
@@ -146,18 +133,28 @@ class TentativeLandmarkManagerConfig:
 
 @dataclass
 class SensorConfig:
-    """Sensor and local-map parameters.
+    """Sensor and local-map parameters. None of these is a tuning value.
 
-    ``range_local`` and ``bearing_local_deg`` define which landmarks in the map
-    are considered candidates for association at the current pose. They control
-    the size of the joint covariance that has to be recovered from the graph,
-    and are therefore the dominant runtime knob.
+    ``range_local`` and ``bearing_local_deg`` define the local map: which
+    landmarks are predicted, offered to data association, and included in the
+    joint covariance recovered from the graph. Set them from what the sensor can
+    see, plus a margin for pose uncertainty. Smaller, and a landmark the sensor
+    does see is missing from the local map, so its measurement becomes a
+    duplicate landmark; larger only costs time.
+
+    ``max_range`` is how far trees are extracted from a Victoria Park laser scan.
+    It must stay below ``range_local``, or a tree near the limit drops out of the
+    local map whenever the pose estimate is slightly off. The simulated data set
+    comes with its measurements already extracted, so it does not use it.
     """
 
+    max_range: float = 50.0
     range_local: float = 50.0
     bearing_local_deg: float = 125.0
 
     def __post_init__(self) -> None:
+        if self.max_range <= 0:
+            raise ValueError(f"max_range must be positive, got {self.max_range}")
         if self.range_local <= 0:
             raise ValueError(f"range_local must be positive, got {self.range_local}")
         if not (0 < self.bearing_local_deg <= 180):
@@ -178,11 +175,16 @@ class AssociationConfig:
         method: ``"jcbb"``, joint compatibility branch and bound (the only one).
         alpha_individual: confidence level of the individual compatibility test.
         alpha_joint: confidence level of the joint compatibility test.
+        inject_wrong_at_step: for Task 4(b). At this scan step, one associated
+            measurement is deliberately re-paired with the wrong landmark (see
+            ``data_association.force_wrong_association``). ``None`` (the
+            default) leaves association alone.
     """
 
     method: str = "jcbb"
     alpha_individual: float = 0.999
     alpha_joint: float = 0.9999
+    inject_wrong_at_step: Optional[int] = None
 
     def __post_init__(self) -> None:
         method_options = ["jcbb"]
@@ -196,6 +198,10 @@ class AssociationConfig:
             )
         if not (0 < self.alpha_joint < 1):
             raise ValueError(f"alpha_joint must be in (0, 1), got {self.alpha_joint}")
+        if self.inject_wrong_at_step is not None and self.inject_wrong_at_step < 0:
+            raise ValueError(
+                f"inject_wrong_at_step must be a scan step (>= 0) or null, got {self.inject_wrong_at_step}"
+            )
 
 
 @dataclass

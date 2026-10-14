@@ -227,7 +227,7 @@ class VictoriaParkLoader:
             yield SlamStepInput(
                 relative_pose=delta_T,
                 relative_pose_cov=delta_cov,
-                measurements=extract_tree_measurements(meas.scan, config.sensor.range_local),
+                measurements=extract_tree_measurements(meas.scan, config.sensor.max_range),
                 scan_time=float(meas.scan_time),
             )
 

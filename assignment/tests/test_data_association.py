@@ -9,6 +9,7 @@ import pytest
 from graphslam.data_association import (
     JCBB_association,
     NIS,
+    force_wrong_association,
     individual_compatibility,
     num_associations,
 )
@@ -106,3 +107,31 @@ def test_nis_is_zero_for_a_perfect_association() -> None:
     )
 
     assert value == pytest.approx(0.0, abs=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# Task 4(b): forcing one wrong association
+# ---------------------------------------------------------------------------
+
+
+def test_force_wrong_association_repairs_one_measurement_to_an_unused_landmark() -> None:
+    measurements = np.array([[5.0, 0.0], [6.0, 0.5]])
+    predicted = np.array([[5.0, 0.0], [6.0, 0.5], [7.0, -1.2], [8.0, 0.1]])
+    association = np.array([0, 1])
+
+    forced = force_wrong_association(association, measurements, predicted)
+
+    assert forced[1] == 1, "only the first associated measurement may change"
+    assert forced[0] == 2, "it should go to the unused landmark whose bearing is furthest from it"
+    assert np.array_equal(association, [0, 1]), "the input association must not be modified"
+
+
+def test_force_wrong_association_leaves_nothing_to_repair_alone() -> None:
+    measurements = np.array([[5.0, 0.0]])
+    predicted = np.array([[5.0, 0.0]])
+
+    unassociated = force_wrong_association(np.array([-1]), measurements, predicted)
+    no_free_landmark = force_wrong_association(np.array([0]), measurements, predicted)
+
+    assert np.array_equal(unassociated, [-1])
+    assert np.array_equal(no_free_landmark, [0])

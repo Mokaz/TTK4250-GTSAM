@@ -28,7 +28,7 @@ from tqdm import tqdm
 
 from graphslam import factor_graph as fg
 from graphslam.config import SlamConfig
-from graphslam.data_association import get_associator
+from graphslam.data_association import force_wrong_association, get_associator
 from graphslam.landmark_manager import get_tentative_landmark_manager
 from graphslam.logger import AssociationDiagnostics, SlamLogger, StepDiagnostics
 from graphslam.utils import pose2_to_array
@@ -300,6 +300,19 @@ def run_slam(
             association = associate(measurements, local_map, S)
             diagnostics.duration_association = time.perf_counter() - t0
 
+            if k == config.association.inject_wrong_at_step:
+                # Task 4(b): one deliberate wrong association.
+                forced = force_wrong_association(
+                    association, measurements, local_map.predicted_measurements
+                )
+                changed = not np.array_equal(forced, association)
+                tqdm.write(
+                    f"Task 4(b): forced one wrong association at step {k}."
+                    if changed
+                    else f"Task 4(b): nothing to re-pair at step {k}; choose another step."
+                )
+                association = forced
+
             is_associated = association >= 0
             for measurement, local_index in zip(
                 measurements[is_associated], association[is_associated]
@@ -399,8 +412,14 @@ def run_slam(
     logger.save_steps_diagnostics(diagnostics_steps)
     logger.save_metadata(final_diagnostics, total_time, dataset=dataset.name, aborted=aborted)
 
-    if save_plots or show_plots:
-        from graphslam.plotter import SlamRunPlotter
+    from graphslam.plotter import SlamRunPlotter
 
-        plotter = SlamRunPlotter.from_run(output_dir)
+    # The summary goes out before any plot window opens: showing the figures
+    # blocks until they are closed.
+    plotter = SlamRunPlotter.from_run(output_dir)
+    summary = plotter.summary()
+    print(summary)
+    logger.save_summary(summary.as_dict())
+
+    if save_plots or show_plots:
         plotter.plot_all(save=save_plots, show=show_plots)

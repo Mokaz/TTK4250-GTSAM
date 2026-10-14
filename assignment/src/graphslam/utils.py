@@ -61,6 +61,14 @@ def pose2_tangent_error(estimate: gtsam.Pose2, truth: gtsam.Pose2) -> np.ndarray
     return gtsam.Pose2.Logmap(estimate.between(truth))
 
 
+def pose2_tangent_errors(poses: np.ndarray, poses_gt: np.ndarray) -> np.ndarray:
+    """:func:`pose2_tangent_error` for every row of two aligned (n, 3) pose arrays."""
+    errors = np.zeros_like(poses, dtype=float)
+    for i, (pose, pose_gt) in enumerate(zip(poses, poses_gt)):
+        errors[i, :] = pose2_tangent_error(gtsam.Pose2(*pose), gtsam.Pose2(*pose_gt))
+    return errors
+
+
 def numerical_jacobian(f, x: np.ndarray, eps: float = 1e-6) -> np.ndarray:
     """Central-difference Jacobian of a vector function of a vector.
 

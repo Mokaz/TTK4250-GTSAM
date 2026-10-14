@@ -2,8 +2,6 @@
 # This file documents what can be set; the tuning you actually run lives in
 # sim_default.yaml and real_default.yaml.
 noise:
-  sigma_velocity: 0.1
-  sigma_steer_deg: 0.5
   sigma_odom_x: 0.1
   sigma_odom_y: 0.1
   sigma_odom_yaw_deg: 0.1
@@ -14,6 +12,7 @@ noise:
   sigma_init_pose_yaw_deg: 0.5
   sigma_gnss: 1.0
 sensor:
+  max_range: 50.0
   range_local: 50.0
   bearing_local_deg: 125.0
 tentative:
@@ -24,6 +23,7 @@ association:
   method: jcbb
   alpha_individual: 0.999
   alpha_joint: 0.9999
+  inject_wrong_at_step: null
 backend:
   solver: isam2
   relinearize_threshold: 0.1
