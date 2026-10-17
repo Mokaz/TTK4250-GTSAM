@@ -28,8 +28,7 @@ stop and read `docs/INSTALL.md`.
 `pip install -e . --no-deps` puts `run_sim`, `run_real` and `plot_run` on your
 path. Re-run it only if entry points change; editing source needs nothing.
 
-Do not use `pip install gtsam` or `uv sync`: PyPI has no Windows wheel for
-GTSAM.
+Do not use `pip install gtsam`: PyPI has no Windows wheel for GTSAM.
 
 ## Running
 

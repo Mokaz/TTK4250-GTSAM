@@ -16,7 +16,7 @@ An example of three different sets of tuning values could be
 \begin{itemize}
     \item a set that gives better performance than the initial tuning values in some way
     \item a set that gives similar performance in terms of error but bad performance in terms of consistency
-    \item a set that yields very few landmarks, but still manages to keep track to some degree
+    \item a set that maps noticeably fewer landmarks, and how that affects the trajectory
 \end{itemize}
 
 \hfill
@@ -36,8 +36,5 @@ Some questions to help discussion (not mandatory to answer):
     \item Would you say that there are any shortcomings of the algorithm on this data set?
 \end{itemize}
 
-\textit{Note}: The runtime can be quite sensitive to the alphas of JCBB.
-This is due both to the depth of search and creation of new landmarks, creating sort of a tradeoff.
-This is especially true when other poor parameters are chosen, so that too few or too many landmarks fit the prediction.
-This is usually seen quite quickly by the associations, and how many new landmarks are created.
+\textit{Note}: The runtime of JCBB grows quickly with the number of duplicate landmarks, because each one gives a measurement more candidates to pair with. A tuning that creates duplicates (noise values the gates cannot cope with, or landmark birth on a single sighting, \(M = N = 1\), with a wrong noise model) can slow a run from seconds to minutes. Watch the map-quality line and how many new landmarks appear.
 The local map, \pythoninline{sensor.range_local} and \pythoninline{sensor.bearing_local_deg}, is not a tuning value: it is set from what the sensor can see, with a margin. Making it smaller hides landmarks the sensor does see from data association, so their measurements become duplicate landmarks, and the run can slow down to the point of hanging.

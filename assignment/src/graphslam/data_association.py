@@ -184,7 +184,7 @@ def force_wrong_association(
     measurements: np.ndarray,
     predicted_measurements: np.ndarray,
 ) -> np.ndarray:
-    """Re-pair one associated measurement with the wrong landmark, for Task 4(b).
+    """Re-pair one associated measurement with the wrong landmark, for Task 4.
 
     The first associated measurement is paired with the local landmark whose
     predicted bearing is furthest from it, among those no other measurement

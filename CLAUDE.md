@@ -25,6 +25,11 @@ cd latex/group-assignment-2-gtsam
 latexmk -lualatex -shell-escape -interaction=nonstopmode -outdir=build ga2_graded2.tex
 ```
 
+The student version (no solution boxes) is `ga2_graded2_student.tex`, a
+wrapper that defines `\studentversion` and inputs `ga2_graded2.tex`; build it
+the same way to get `build/ga2_graded2_student.pdf` next to the solution PDF.
+Rebuild both before a release; day to day, the solution PDF is enough.
+
 It needs LuaLaTeX (fontspec) and `-shell-escape` (minted). Check the log for
 `!` errors, and look at the rendered page when a change adds long inline code:
 `\pythoninline` does not wrap, so a long call runs past the margin.
@@ -34,6 +39,11 @@ file" or a locked `.data.minted` file, Martin's editor is building into the same
 A collision can also leave a corrupt PDF while your own `latexmk` exits 0, so
 check `tasklist | findstr latexmk` before building, and verify afterwards that
 `pdftotext build/ga2_graded2.pdf -` prints no "Syntax Error" lines.
+
+The solution boxes are generated from the reference code, and a line longer than
+about 88 characters runs out of the box (94 overflowed, 90 just did). Keep
+lines inside the graded functions, signatures included, under that: wrap them
+in the code, then regenerate the snippets with `--latex`.
 
 `assignment/` is the source of truth. `handout/` is regenerated from it with
 `python tools/make_handout.py --out ../handout`; the LaTeX code snippets come
@@ -57,9 +67,11 @@ from `assignment/`. Zip it at release time instead of tracking it.
 
 ## Environment
 
-conda, not uv — GTSAM 4.3 has no Windows wheel on PyPI. Environment name
+conda, not pip or uv — GTSAM 4.3 has no Windows wheel on PyPI. Environment name
 `ttk4250_ga2`, built from `assignment/environment.yml`, with the package
-registered via `pip install -e . --no-deps`.
+registered via `pip install -e . --no-deps`. The build backend is setuptools
+(17 Oct; it was `uv_build`), and the handout mentions uv nowhere, so students
+are not pointed at a route that fails on Windows.
 
 Shell activation does not reliably survive into an agent's shell on Windows.
 Prefer running things explicitly in the environment:
@@ -72,10 +84,12 @@ conda run --no-capture-output -n ttk4250_ga2 run_real --steps 2000 --no-show-plo
 If you do activate first (`conda activate ttk4250_ga2`), plain `pytest`,
 `run_sim`, `run_real` and `plot_run` all work.
 
-`docs/INSTALL.md` carries the student-facing setup, including three Windows
-traps that cost real time (old Anaconda conda cannot solve the env; Anaconda's
-`conda init cmd.exe` AutoRun hook hijacks a fresh Miniconda prompt; a fresh
-Miniconda stops on `CondaToSNonInteractiveError`).
+`docs/INSTALL.md` carries the student-facing setup, cut to the essentials on
+17 Oct: conda must be 25 or newer (an existing Anaconda often supplies an older
+one), and a fresh Miniconda stops on `CondaToSNonInteractiveError` until the
+Anaconda channels are accepted or removed. The removed details (the `__win`
+solve failure, the AutoRun hook, activation by full path) are in git history if
+students hit them.
 
 ## The editable-install trap — read this before debugging anything
 
@@ -138,7 +152,7 @@ guards the whole path for every route.
 
 ## Testing
 
-95 tests, ~10 s. The suite is also the grading instrument, so a test's failure
+98 tests, ~10 s. The suite is also the grading instrument, so a test's failure
 message is student-facing: write them that way.
 
 Every test of a graded function carries one pytest marker named after its part
@@ -151,8 +165,8 @@ another graded function. Given-code tests in the graded files are marked
 catches typos.
 
 Run the handout through the suite after any change to the solution blocks — the
-expected result is that only the tests touching given code pass, currently 35
-of 95. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
+expected result is that only the tests touching given code pass, currently 38
+of 98. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
 check that no graded work hides behind a given-code test, not a scoring floor.
 
 `tests/test_plotting.py` exists because every other test runs with
@@ -218,14 +232,55 @@ run is the one Task 3 asks for; it diverges completely and takes twice as long.
   run (every set with odometry translation 0.2 m or less broke in the 9 Oct
   search), because independent-increment odometry cannot be right both per step
   and over a loop. Task 3 asks for one tuning set that lowers the odometry
-  noise. **Corrected 9 Oct:** the landmark NIS *can* reach 1 the other way,
-  trusting the lidar more and the odometry less: odometry 0.5 m with R 0.1 m /
-  0.1 deg gives ANIS 1.05 and 1.49 m at 2000 steps, and 0.98 / 3.94 m / 389
-  landmarks over the full run (baseline 0.26 / 1.79 m / 288). A tight R with
-  the baseline's 0.3 m odometry breaks (55 m). So the low NIS is mostly a too
-  large R, and Q must stay large because wheel errors are correlated. Task 3's
-  text still fits; the solving guide has the table.
-- **Task 4(b) uses `association.inject_wrong_at_step` (decided 14 Oct).**
+  noise. **Corrected 15 Oct (32 full runs):** the low landmark NIS is a too
+  large R, and the default gates are what make a tight R break. R 0.1 m / 0.1
+  deg alone breaks (540 landmarks, 55 m) because real tree measurements have
+  heavier tails than a Gaussian, so true re-observations fall outside the
+  gates and become duplicates. With both gates at 0.999999 the same R gives
+  landmark ANIS 1.11 at 1.81 m and 302 landmarks: locally consistent and as
+  accurate as the baseline, so it beats it. Either gate loosened alone still
+  breaks (47 / 52 m); 0.99999 half-breaks (3.6 m). Lower odometry noise breaks
+  even with loose gates (199 m), so that failure is the odometry model
+  (correlated wheel errors), not association. Accuracy has a floor: every
+  working set lands at 1.78-2.07 m from GPS (1 m GPS noise puts a perfect
+  trajectory ~1.4 m away), so on Victoria Park the sets differ in
+  consistency, map size and whether the run holds together, not accuracy.
+  Odometry must stay loose in every direction: tightening x only (14 m), y
+  only (169 m) or yaw to 0.4 deg (40 m) breaks. Looser birth (M 2, N 3): 415
+  landmarks, same accuracy, twice the run time. The earlier "balance between
+  Q and R" explanation was wrong. **No worse Victoria Park baseline (decided
+  15 Oct):** no working tuning is visibly more accurate, and the
+  degraded-but-working region (4-17 m) is partly broken maps. Task 3 instead
+  says the baseline is good but inconsistent, that a better set improves
+  consistency without losing accuracy, and that a broken run should be
+  described and explained, noting that not every break has the same cause.
+  The required lower-odometry set is called "the obvious first guess", not
+  the fix, and the `preintegrate` hint is tied to it alone. Both shipped
+  configs say an alpha is a confidence, closer to 1 a looser gate, so the
+  best set (tight R, both gates 0.999999) is reachable. "Plan your runs" no longer claims 2000 steps
+  predict the full run: odometry 0.5 m with R 0.1 m / 0.1 deg is 1.49 m at
+  2000 steps and 3.94 m over the full run. The solving guide and the Task 3
+  dashboard have the sets.
+- **Task 4 is one experiment (decided 15 Oct): one bad association, on the
+  simulated data.** Relinearization (old 4(a)) and the optional batch solver
+  were dropped: their only finding was "the estimate does not change, the time
+  does", too little per report word. Students run step 600 on the sim with
+  and without Huber (clean win from the shipped tuning and the true noise
+  alike: 1.08 -> 6.82 -> 1.08 m; 0.41 -> 13.9 -> 0.41 m), explain what Huber
+  does to (9.6), and compare with EKF-SLAM. What the kernel costs is only an
+  optional discussion question (16 Oct: a required question about a Victoria
+  Park run students never see was cut; they had enough to write). The answer
+  is the Victoria Park k 1.345 case below: a sharp turn around scan 860 (yaw
+  rate up to ~30 deg/s), and a kernel on the measurement factors only, which
+  cannot tell an outlier from good measurements disagreeing with a bad
+  odometry prediction. Task 4 dashboard: https://claude.ai/artifact/J95AASS8tjQZ9hxhKWPSJZ.
+  The relinearization settings lost their `TODO tune (Task 4)`. Students run
+  `configs/task4.yaml` (16 Oct): the shipped sim tuning plus
+  `inject_wrong_at_step: 600`, no `TODO tune` comments; the text gives the
+  command and has them edit `robust_kernel` to `huber` for the second run.
+  `test_task4_config_is_the_sim_baseline_with_one_forced_mistake` keeps it in
+  step with `sim_default.yaml`: change both together.
+- **Task 4 uses `association.inject_wrong_at_step` (decided 14 Oct).**
   Loosening the gates produces no mistake on either data set (checked up to
   1 - 1e-12), so the text now has students force one: at that scan step,
   `data_association.force_wrong_association` re-pairs the first associated
@@ -239,9 +294,32 @@ run is the one Task 3 asks for; it diverges completely and takes twice as long.
   run (25 / 22 m). (An earlier wrapper without the bearing wrap picked a
   different landmark and barely moved the baseline: 1.08 -> 1.11 m.) Do not "fix" the shipped
   tuning: finding this is the task.
+  **Full runs, 15 Oct (ga2_student, Task 4 dashboard):** Victoria Park step
+  1500 -> 28 m, 404 landmarks; Huber k 5 absorbs it (1.78 m, 293) and costs
+  nothing clean. Huber k 1.345 breaks a *clean* full run (80 m, 582), identical
+  with or without the mistake: around scan 860 the odometry goes wrong (most
+  likely slip) and most associated measurements are 4-7 sigma off at once;
+  least squares moves the pose, Huber downweights them all (k/|e|), the pose
+  stays, association collapses (0-2 of 7-13 associated, scans 862-870) and
+  duplicates follow. Not stale robust weights: eager relinearization breaks
+  too. Only 17% of correct VP re-observations exceed k in R units (sim: 65%,
+  harmless), so it is the burst, not the bulk. Sim (true noise): Huber 1.345
+  costs nothing clean (0.41 m, ANEES 2.01 vs 1.91).
+- **Relinearization, dropped from Task 4 (measured 15 Oct):** the estimate barely
+  changes; the time does. Eager (threshold 0.001, skip 1): sim identical,
+  iSAM2 update 2.0 -> 8.0 s; Victoria Park identical (288, 1.79 m), update
+  47 -> 213 s, run 108 -> 312 s, covariance recovery doubles. Lazy (10, 100,
+  i.e. never): sim identical; Victoria Park 1.88 m, 295 landmarks, update only
+  11% less. New poses start at the odometry prediction, so linearization
+  points are already close.
+- **Report limit (decided 17 Oct): 1300 words and 7 pages in total**, captions
+  excluded. Raised from 1000 when Task 4 added about 300 words of required
+  reasoning; the old "(1 frontpage, 6 pages of content, 1 page of
+  bibliography)" added up to 8 and was cut; Martin set 7 pages in total. The Task 4 dashboard suggests
+  530 / 470 / 300 words for Tasks 2 / 3 / 4.
 - **Pass/fail (decided 2 Oct).** The number of tests passed is not a score;
   it feeds an overall evaluation of the submission together with the report.
-  `ga2_graded2.tex` and `ga2_task01_implement.tex` say so. The text talks about
+  `ga2_graded2.tex` says so (Task 1 no longer repeats it, 17 Oct). The text talks about
   neither grades nor points anywhere; keep it that way.
 - `jointMarginalSupportCliqueCount` is not in GTSAM 4.3, so
   `num_support_cliques` is always zero. The plots that used it are skipped

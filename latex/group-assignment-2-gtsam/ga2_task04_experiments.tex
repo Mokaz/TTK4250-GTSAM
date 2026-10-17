@@ -1,19 +1,33 @@
-\titledquestion{Two short experiments}
+\titledquestion{One bad association}
 \label{q:task04}
-Both of these are quick to run and belong in the report as a figure and a paragraph each. Use whichever data set makes the point most clearly.
+In this short task, we will look at what happens when a data association is wrong, and how a robust loss function can help. The experiment is quick to run, and its discussion should be included in the report as one figure and a paragraph.
 
-\begin{parts}
-    \part \textbf{Relinearization.} iSAM2 does not relinearize everything at every step; it relinearizes the variables whose estimates have moved enough to warrant it. Two knobs control this: \pythoninline{backend.relinearize_threshold}, how far an estimate must move, and \pythoninline{backend.relinearize_skip}, how many steps pass between checks.
+The config \pythoninline{configs/task4.yaml} sets \pythoninline{inject_wrong_at_step: 600} under \pythoninline{association}, which re-pairs one measurement with the wrong landmark at step 600. Everything else is the same as in \pythoninline{configs/sim_default.yaml}, the default tuning from Task~\ref{q:task02}. Run it with
+\begin{center}
+    \pythoninline{run_sim --config configs/task4.yaml --output-dir runs/task4}
+\end{center}
+and explain what this single wrong association does to the trajectory and the map, using the error values and landmark counts from the run summary. How does the NIS behave at step 600 and in the steps after it, and why?
 
-    Push both to extremes and report what happens to accuracy, consistency and runtime. Relate your results to Sec.\ 9.5.1, which explains why ISAM had to linearize as seldom as possible and why being able to restrict relinearization to the affected variables is what makes ISAM2 worthwhile.
+The Huber loss is a robust loss function (GTSAM calls it a robust kernel, hence the config name) that is quadratic for small errors and linear for large ones:
+\[
+    \rho_\delta(e) =
+    \begin{cases}
+        e^2, & |e| \le \delta, \\
+        2\delta|e| - \delta^2, & |e| > \delta.
+    \end{cases}
+\]
+With \pythoninline{backend.robust_kernel: huber}, each landmark term in (9.6) changes from
+\[
+    \|h(x_k, m^i) - z^i_k\|_R^2
+    \quad\text{to}\quad
+    \rho_\delta\big(\|h(x_k, m^i) - z^i_k\|_R\big),
+\]
+where \(\|h(x_k, m^i) - z^i_k\|_R\) is the measurement error normalized by the measurement noise covariance \(R\) (its Mahalanobis distance), so the threshold \(\delta\), set by \pythoninline{backend.huber_k}, is in units of measurement noise standard deviations. For more background, see the \href{https://en.wikipedia.org/wiki/Huber_loss}{Wikipedia article on the Huber loss}\footnote{\href{https://en.wikipedia.org/wiki/Huber_loss}{https://en.wikipedia.org/wiki/Huber\_loss}}, which defines it with an extra factor \(\tfrac12\).
 
-    \part \textbf{One bad association.} Loosening the gates does not make JCBB err on these data sets, so force a mistake instead: \pythoninline{association.inject_wrong_at_step} re-pairs one measurement with the wrong landmark at that scan step (600 works well on the simulated data, 1500 on Victoria Park). Show what this single wrong association does to the map.
+Edit \pythoninline{configs/task4.yaml}: set \pythoninline{backend.robust_kernel: huber}, and run the simulation again with
+\begin{center}
+    \pythoninline{run_sim --config configs/task4.yaml --output-dir runs/task4_huber}
+\end{center}
+Explain how this changes the cost function (9.6) for the wrong measurement, and why that helps.
 
-    Then set \pythoninline{backend.robust_kernel: huber} and run the same thing again. Explain what the robust kernel does to the cost function (9.6), why that helps, and what it costs you when the associations are in fact all correct.
-
-    In your discussion, compare this with EKF-SLAM (Sec.\ 7.2): what are your options for recovering from a wrong association in each of the two frameworks?
-\end{parts}
-
-\hfill
-
-\textit{Optional, if you have time}: \pythoninline{backend.solver: batch} re-solves the entire graph with Levenberg-Marquardt at every step instead of updating it incrementally. It is the honest implementation of (9.13), and iSAM2 is an incremental approximation of it. Run both on the simulated data set and compare the estimates and the runtimes. Do not try it on Victoria Park unless you have an afternoon to spare -- which is itself the point of Sec.\ 9.3.3.
+Finally, compare with EKF-SLAM (Sec.\ 7.2): what are your options for recovering from a wrong association in each of the two frameworks?

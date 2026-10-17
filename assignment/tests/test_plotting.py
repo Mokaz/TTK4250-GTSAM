@@ -129,6 +129,24 @@ def test_a_run_stores_its_summary_and_it_matches_the_figures(plotted_run: Path) 
 
 
 @needs_data
+def test_the_landmark_nis_figure_reports_the_share_inside_its_bounds(plotted_run: Path) -> None:
+    """Task 2 asks for the share of per-step NIS values inside the bounds; the figure states it."""
+    from graphslam.evaluation import chi2_bounds, landmark_nis
+    from graphslam.plotter import SlamRunPlotter
+
+    plotter = SlamRunPlotter.from_run(plotted_run)
+    nis, dofs, _ = landmark_nis(plotter.association)
+    lower, upper = chi2_bounds(dofs)
+    expected = 100.0 * np.mean((nis >= lower) & (nis <= upper))
+
+    _, ax = plotter.plot_landmark_nis()
+    title = ax.get_title()
+    assert f"{expected:.1f}% inside the 95% bounds" in title, (
+        f"the landmark NIS title says {title!r}, but {expected:.1f}% of the per-step values are inside"
+    )
+
+
+@needs_data
 def test_position_nis_plot_runs(plotted_run: Path) -> None:
     """The one plot the simulated set cannot reach on its own.
 

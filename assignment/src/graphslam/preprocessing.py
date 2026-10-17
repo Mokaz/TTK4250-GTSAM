@@ -38,7 +38,9 @@ CAR = Car()
 # ---------------------------------------------------------------------------
 
 
-def relative_pose(vel_encoder: float, steer: float, dt: float, car: Car = CAR) -> gtsam.Pose2:
+def relative_pose(
+    vel_encoder: float, steer: float, dt: float, car: Car = CAR
+) -> gtsam.Pose2:
     """Relative pose increment from one wheel-encoder reading. Task 1 (a).
 
     Parameters

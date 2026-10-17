@@ -11,7 +11,9 @@ def predict_measurement(
     H_bearing_landmark = np.zeros((1, 2), order="F")
 
     predicted_range = pose.range(landmark, H_range_pose, H_range_landmark)
-    predicted_bearing = pose.bearing(landmark, H_bearing_pose, H_bearing_landmark).theta()
+    predicted_bearing = pose.bearing(
+        landmark, H_bearing_pose, H_bearing_landmark
+    ).theta()
 
     z = np.array([predicted_range, predicted_bearing])
     H_pose = np.vstack((H_range_pose, H_bearing_pose))

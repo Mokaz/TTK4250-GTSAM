@@ -19,17 +19,14 @@ dependencies = [
     "tqdm>=4.66",
 ]
 
-[dependency-groups]
-dev = ["pytest>=8.0"]
-
 [project.scripts]
 run_sim = "graphslam.run_sim:main"
 run_real = "graphslam.run_real:main"
 plot_run = "graphslam.plotter:main"
 
 [build-system]
-requires = ["uv_build>=0.11.16,<0.12"]
-build-backend = "uv_build"
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

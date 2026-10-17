@@ -7,7 +7,8 @@
 \renewcommand{\thesubpart}{\thepartno\arabic{subpart}}
 \renewcommand{\subpartlabel}{(\thesubpart)}
 
-\printanswers
+% ga2_graded2_student.tex defines \studentversion and builds this file without the solutions.
+\ifdefined\studentversion\else\printanswers\fi
 \assignmentnr{2}
 \deadline{Tuesday {3}. November 23:59}
 
@@ -27,9 +28,9 @@ The assignment is pass/fail. The number of tests your code passes is part of how
 If you notice the tests having false negatives or positives, or behaving weirdly, please let us know.
 
 \section*{Report content:}
-For the report you are limited to 1000 words and a total of 6 pages (1 frontpage, 6 pages of content, 1 page of bibliography). Figure captions do not count toward the limit, as long as they are concise and purely descriptive. The group number and group members should be clearly stated.
+For the report you are limited to 1300 words and a total of 7 pages. Figure captions do not count toward the limit, as long as they are concise and purely descriptive. The group number and group members should be clearly stated.
 
-In the report we simply require you to clearly answer Task \ref{q:task02}, \ref{q:task03} and \ref{q:task04}. As the report is short you can skip the introduction and conclusion.
+In the report we require you to clearly answer Task \ref{q:task02}, \ref{q:task03} and \ref{q:task04}. As the report is short you can skip the introduction and conclusion.
 You can assume the person reading the report has good knowledge of the subject.
 You can simply refer to equations and algorithms in the book when what you want to say is already stated there.
 Ex: "Given what's stated in (12.34) and equation (56.78) in the book the oscillations in Figure 9 are expected" (When refering to equations, figures etc. you should make it clear if you are refering to equations, figures etc. in the book or report).
@@ -39,66 +40,59 @@ Ex: If you write "These parameters gave bad results", you should also include so
 
 It is not expected that you present all the results, plots, and tuning variables from the code, but rather that you present and discuss the ones you find most relevant for each part of the assignment. The report should, however, include all four main types of plots (state, NIS, NEES, error).
 
-If you have any questions please make a post on the forum and we will try to answer them as soon as possible or contact the student assistants during the excise class.
+In Tasks \ref{q:task02} and \ref{q:task03} you will experiment with different sets of tuning values. Every run saves the figures below in its run directory (re-plot a finished run with \pythoninline{plot_run}), and prints a summary with the RMSE, the averaged NEES and NIS with their 95\% intervals and, on the simulated data, the map-quality counts. You do not need every figure for every set: use the ones that support your discussion, and combine them into multi-panel figures where that saves space.
 
-In task 2 and 3 you will be asked to try out different sets of tuning values. The following list should not be completed for every set of tuning values, but in total we want to see the following from running on the simulated data
+From the simulated data:
 \begin{itemize}
-	\item plot of trajectory and map.
-	\item position estimate error over time
-	\item the error of a pose as estimated at the time it was added, against its error in the final smoothed estimate,
-	\item plot of the NIS along with your chosen confidence bounds over time,
-	\item plot of pose NEES along with your chosen confidence bounds over time,
-	\item the averaged NIS along with your confidence bound, where the average can for instance be over number of associated landmarks in total,
-	\item the averaged NEES along with your confidence bounds,
-	\item the number of times NIS falls within your confidence bounds
-	\item the number of times the NEES fall within your confidence regions
-	\item and the RMSE (mean taken over time)
-	\item (Optional) NEES of the map.
+	\item \pythoninline{final_snapshot}: the trajectory and the map against the ground truth, with the map-quality counts in the title.
+	\item \pythoninline{pose_diagnostics}: the \(x\), \(y\) and heading errors over time with their \(\pm 1\), 2 and \(3\sigma\) covariance envelopes, and their RMSE.
+	\item \pythoninline{pose_nees}: the pose NEES over time with its 95\% bounds and the share inside them, and the ANEES with its interval.
+	\item \pythoninline{landmark_nis}: the landmark NIS per degree of freedom over time with its 95\% bounds and the share inside them, and the ANIS with its interval.
 \end{itemize}
 
-From running on real data this list reduces to
+From Victoria Park, which has no ground truth:
 \begin{itemize}
-	\item plot of trajectory and map.
-	\item position vs GPS distance over time.
-	\item plot of the NIS along with your chosen confidence bound over time,
-	\item the averaged NIS along with the confidence bound,
-	\item the number of times NIS falls within your confidence bounds
-	\item (Optional) show GPS in a NIS or NEES
+	\item \pythoninline{final_snapshot}: the trajectory and the map against the GPS.
+	\item \pythoninline{position_nis}: the NIS of the GPS positions over time with its 95\% bounds and the share inside them, and the ANIS with its interval.
+	\item \pythoninline{landmark_nis}: as for the simulated data.
+	\item \pythoninline{landmark_growth}: the number of landmarks over time, which shows when data association starts to fail.
 \end{itemize}
+The timing figures (\pythoninline{timing_*} and \pythoninline{landmarks_and_timing}) are there if run time helps your discussion.
 
 We expect you to discuss what these plots and numbers mean in practice, and how they are connected to the different tuning parameters.
 
 Answers and analysis should connect theory and results to the real world, and show your understanding of the problem and the solution. Theoretical or practical insight from the lectures or book elaborated upon or applied to the data sets counts positive.
 
 Other plots, numbers, and considerations are welcome too, but what to show is \emph{up to you} to decide.
-We also invite you to be critical about the assumptions made and the implementation of the system.
 Try to connect the results on the simulated data to the results of the real data where it is possible.
-Where a comparison with EKF-SLAM (Sec.\ 7.2 of the book) helps explain a result, make it.
 
-We know the task description can be a bit vague, but we don't want you to end up writing different copies of the same report. Rest assured that two very different reports can both be very good.
-
-If you have any questions please make a post on the forum and we will try to answer them as soon as possible.
+If you have any questions please make a post on the GA2 discussion thread on Canvas and we will try to answer them as soon as possible or contact the student assistants during the excise class.
 
 \noindent\makebox[\linewidth]{\rule{\textwidth}{0.4pt}}
 
 \section*{Some background on the template code}
-The template code is a trimmed-down version of a factor graph SLAM system built on \href{https://gtsam.org}{GTSAM}, the library referred to in Sec.\ 9.5 of the book. GTSAM provides the back-end: it holds the factor graph, maintains the Bayes tree, and solves for the MAP estimate incrementally with iSAM2. Everything that GTSAM does \emph{not} do -- building the right factors, recovering a covariance from the graph, and data association -- is either yours to implement or given in the front-end.
+The template code is a trimmed-down version of a factor graph SLAM system built on \href{https://gtsam.org}{GTSAM}, the library referred to in Sec.\ 9.5 of the book. GTSAM provides the back-end: it holds the factor graph, maintains the Bayes tree, solves for the MAP estimate incrementally with iSAM2, and recovers marginal covariances from it. Everything around that is the front-end: turning odometry and lidar data into factors, predicting the measurements and their innovation covariance, deciding which measurement belongs to which landmark, and when a new landmark is born. Data association itself (JCBB) is given, the factors and the quantities it relies on are yours to implement in Task~\ref{q:task01}.
 
-Set up the environment with \pythoninline{conda env create -f environment.yml}, then \pythoninline{conda activate ttk4250_ga2} and \pythoninline{pip install -e . --no-deps}. Run the tests with \pythoninline{pytest}. Runs are started with \pythoninline{run_sim} and \pythoninline{run_real}, and an existing run can be re-plotted with \pythoninline{plot_run <run directory>}. Ctrl+C stops a run and still saves it up to the last completed step; add \pythoninline{--no-save-on-abort} if you would rather it just exit. Do \emph{not} use \pythoninline{pip install gtsam}: PyPI publishes no Windows wheel for GTSAM, which is why the environment comes from conda-forge. See \pythoninline{docs/INSTALL.md}. \pythoninline{docs/GTSAM.md} lists every GTSAM call Task~\ref{q:task01} needs, with what each one means.
+Set up the environment from the handout folder with
+\begin{center}
+    \pythoninline{conda env create -f environment.yml} \\
+    \pythoninline{conda activate ttk4250_ga2} \\
+    \pythoninline{pip install -e . --no-deps}
+\end{center}
+Run the tests with \pythoninline{pytest}. Runs are started with \pythoninline{run_sim} and \pythoninline{run_real}, and an existing run can be re-plotted with \pythoninline{plot_run <run directory>}. Ctrl+C stops a run and still saves it up to the last completed step; add \pythoninline{--no-save-on-abort} if you would rather it just exit. Setup problems, especially on Windows, are covered in \pythoninline{docs/INSTALL.md}.
 
 The files handed out are:
 \begin{itemize}
-	\item \pythoninline{configs/}: the run configurations. Everything marked \pythoninline{# TODO tune} is yours to experiment with in Task \ref{q:task02} and \ref{q:task03}.
-	\item \pythoninline{preprocessing.py}: the odometry and lidar front-end. \pythoninline{relative_pose} and \pythoninline{preintegrate} are yours; \pythoninline{detect_trees}, which converts a raw lidar scan into range-bearing measurements, is given. \textbf{NB:} you do not need to change anything below the line in this file.
-	\item \pythoninline{factor_graph.py}: factor construction, the measurement model, covariance recovery and the innovation covariance. Most of your work is here.
+	\item \pythoninline{configs/}: the run configurations. Everything marked \pythoninline{# TODO tune} is yours to experiment with in Tasks~\ref{q:task02} and~\ref{q:task03}.
+	\item \pythoninline{docs/GTSAM.md}: every GTSAM call Task~\ref{q:task01} needs, with what each one means. Read it before you start.
+	\item \pythoninline{preprocessing.py}: the odometry and lidar front-end. \pythoninline{relative_pose} and \pythoninline{preintegrate} are yours; the lidar part at the bottom of the file, which turns a raw scan into range-bearing measurements, is given.
+	\item \pythoninline{factor_graph.py}: pose prediction, the odometry and landmark factors, the measurement model and its inverse, the joint covariance assembled from GTSAM's marginals, and the innovation covariance. Most of your work is here.
 	\item \pythoninline{landmark_manager.py}: landmark birth. The \(M\) of \(N\) rule is yours; the rest is given.
-	\item \pythoninline{data_association.py}: the JCBB algorithm. \textbf{NB:} you do not need to do anything in this file.
-	\item \pythoninline{evaluation.py}: compares the finished map with the true landmarks on the simulated data set. Every simulated run reports how many true landmarks were mapped, missed, duplicated or spurious. \textbf{NB:} you do not need to do anything in this file.
+	\item \pythoninline{data_association.py}: the JCBB algorithm, and the forced wrong association for Task~\ref{q:task04}. \textbf{NB:} you do not need to do anything in this file.
+	\item \pythoninline{evaluation.py}: the NEES, the NIS, their bounds and the run summary, and, on the simulated data, the comparison of the finished map with the true landmarks. \textbf{NB:} you do not need to do anything in this file.
 	\item \pythoninline{slam.py}: the main loop that ties all of the above together. Reading it is the fastest way to understand what happens in one time step. \textbf{NB:} you do not need to do anything in this file.
 	\item \pythoninline{loaders/}, \pythoninline{logger.py}, \pythoninline{plotter.py}, \pythoninline{plotting/}: data set adapters, run logging, and all the plotting. \textbf{NB:} you do not need to do anything in these files.
 \end{itemize}
-
-Two conventions in this code base are easy to get backwards, and both produce a system that runs and looks plausible while being wrong: measurements are ordered \([\text{range}, \text{bearing}]\) while GTSAM's \pythoninline{BearingRangeFactor2D} takes bearing first, and all pose covariances and Jacobians live in the tangent space of the current estimate rather than in raw \((x, y, \psi)\) coordinates. Both are discussed where they matter in Task \ref{q:task01}.
 
 \rule{\textwidth}{0.4pt}
 

@@ -175,7 +175,7 @@ class AssociationConfig:
         method: ``"jcbb"``, joint compatibility branch and bound (the only one).
         alpha_individual: confidence level of the individual compatibility test.
         alpha_joint: confidence level of the joint compatibility test.
-        inject_wrong_at_step: for Task 4(b). At this scan step, one associated
+        inject_wrong_at_step: for Task 4. At this scan step, one associated
             measurement is deliberately re-paired with the wrong landmark (see
             ``data_association.force_wrong_association``). ``None`` (the
             default) leaves association alone.

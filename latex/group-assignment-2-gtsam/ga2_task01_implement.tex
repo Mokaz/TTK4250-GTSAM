@@ -1,72 +1,65 @@
 \titledquestion{Implement factor graph SLAM}
 \label{q:task01}
-A factor graph SLAM system has three jobs: build the graph, recover a covariance from it, and use that covariance to decide which measurement belongs to which landmark.
-The back-end (iSAM2, through GTSAM) does the optimization for you; everything below is the part it does \emph{not} do.
+A factor graph SLAM system turns sensor data into a graph and solves it. The back-end (iSAM2, through GTSAM) does the solving: it optimizes the graph and recovers covariances from it. Everything around it is yours to implement in this task: turning wheel odometry into relative poses (a, b), adding the factors (c), predicting each measurement and how uncertain that prediction is (d--f), which is what the given JCBB needs to decide which measurement belongs to which landmark, and placing and confirming new landmarks (g, h).
 
 All functions are marked with \pythoninline{# TODO} in the code. The GTSAM calls you need are listed in \pythoninline{docs/GTSAM.md}, and your editor shows their signatures.
 
 \paragraph{Testing your code.}
-Each part has its own tests, selected by a pytest marker named after the part: \pythoninline{pytest -m b} runs the tests for (b), and \pythoninline{pytest -m c2} those for (c2). Add \pythoninline{-x} to stop at the first failure. Plain \pythoninline{pytest} runs everything, including the end-to-end tests, which need all parts. How many tests pass is part of how we evaluate your submission as a whole.
-
-% Two conventions are worth fixing in your head before you start, because both produce systems that run happily while being wrong:
-% \begin{itemize}
-%     \item Measurements are ordered \([\text{range}, \text{bearing}]\) everywhere in this code base. GTSAM's \pythoninline{BearingRangeFactor2D} takes \emph{bearing first}.
-%     \item The covariance GTSAM reports for a \pythoninline{Pose2}, and the Jacobians returned by \pythoninline{Pose2.range} and \pythoninline{Pose2.bearing}, both live in the \emph{tangent space} at the current estimate (Sec.\ 6.2 in the book), not in raw \((x, y, \psi)\) coordinates. Used together they are consistent. Mixing either with a hand-derived \(\partial/\partial[x, y, \psi]\) is not.
-% \end{itemize} % TODO: Maybe not needed for tasks? Check if necessary
+Each part has its own tests, selected by a pytest marker named after the part: \pythoninline{pytest -m b} runs the tests for (b), and \pythoninline{pytest -m c2} those for (c2). Add \pythoninline{-x} to stop at the first failure. Use them to check each part as you go. \pythoninline{pytest} runs everything, including the end-to-end tests, which need all parts.
 
 \begin{parts}
 
-    % ------------------------------------------------------------------ (a) % TODO ADD: gtsam.Pose2.Expmap expects np.array 
+    % ------------------------------------------------------------------ (a)
     \part Implement \input{py/gtsam/a/def.tex}, which turns one wheel-encoder reading into a relative pose increment.
 
-    The Victoria Park vehicle reports a forward speed \(v_e\) measured at the left rear wheel and a steering angle \(\alpha\). The encoder sits a distance \(H\) off the centre line, so during a turn it travels along a different arc than the centre of the rear axle. With \(L\) the axle distance, the kinematic bicycle model gives the body twist
+    The Victoria Park vehicle reports a forward speed \(v_e\) measured at the left rear wheel and a steering angle \(\alpha\). The encoder sits a distance \(H\) off the centre line, so during a turn it travels along a different arc than the centre of the rear axle. With \(L\) the wheelbase, the distance between the axles, the kinematic bicycle model gives the body twist
     \begin{align*}
         v_b    & = \frac{v_e}{1 - \frac{H}{L}\tan\alpha}, &
         \omega & = \frac{v_b}{L}\tan\alpha,               &
         \xi    & = \begin{bmatrix} v_b & 0 & \omega\end{bmatrix}^T.
     \end{align*}
-    Held constant over the interval, this twist integrates \emph{exactly} to \(\Delta T = \mathrm{Exp}(\xi\,\Delta t)\), which follows a circular arc.
+    Held constant over the time \(\Delta t\) between two odometry readings, this twist integrates \emph{exactly} to \(\Delta T = \mathrm{Exp}(\xi\,\Delta t)\), which follows a circular arc.
 
     \begin{longhint}
-        Do not Euler-integrate into \(\begin{bmatrix} v_b\Delta t & 0 & \omega\Delta t\end{bmatrix}\) and build a \pythoninline{Pose2} from that. The difference is second order in \(\omega \Delta t\): invisible in one step, and clearly visible after a few thousand of them. The exponential map is covered in Sec.\ 6.2.3; \pythoninline{gtsam.Pose2.Expmap} implements it, taking \(\xi\Delta t\) as a numpy array. The vehicle geometry is the \pythoninline{car} argument: \(H\) is \pythoninline{car.H} and \(L\) is \pythoninline{car.L}.
+        The exponential map is covered in Sec.\ 6.2.3. \pythoninline{gtsam.Pose2.Expmap} implements it, taking \(\xi\Delta t\) as a numpy array. The vehicle geometry is the \pythoninline{car} argument: \(H\) is \pythoninline{car.H} and \(L\) is \pythoninline{car.L}.
     \end{longhint}
     \begin{solution} \input{py/gtsam/a/solu.tex} \end{solution}
 
     % ------------------------------------------------------------------ (b)
     \breakans
-    \part Implement \input{py/gtsam/b/def.tex}, which compounds a sequence of relative poses into a single one, with covariance.
+    \part Implement \input{py/gtsam/b/def.tex}, which compounds a sequence of relative poses into a single one, with corresponding covariance.
 
-    Wheel odometry arrives far faster than lidar scans. Rather than putting a pose in the graph for every encoder tick, all increments between two scans are compounded into one relative pose and one covariance, which enter the graph as a single \pythoninline{BetweenFactorPose2}. This is \emph{preintegration}, mentioned in Sec.\ 9.1 -- the same idea used for IMU data, in its simplest form.
+    Wheel odometry arrives far faster than lidar scans. Rather than putting a pose in the graph for every encoder reading, all increments between two scans are compounded into one relative pose and one covariance, which is added to the graph as a single \pythoninline{BetweenFactorPose2}. This is called \emph{preintegration} (Sec.\ 9.1).
 
-    The mean is repeated composition. The covariance is the interesting part: composition is nonlinear, so each increment's covariance must be pushed through the Jacobians of the composition,
+    The mean is repeated composition. For the covariance, propagate it through the Jacobians of each composition:
     \[
         \Sigma \leftarrow H_1 \Sigma H_1^T + H_2 \Sigma_i H_2^T,
     \]
-    where \(H_1\) and \(H_2\) are the Jacobians of \pythoninline{compose} with respect to its first and second argument. This is ordinary linear covariance propagation; it just happens on a manifold, so the Jacobians are those of the group operation rather than of a vector sum.
+    where \(\Sigma_i\) is the covariance of increment \(i\), and \(H_1\) and \(H_2\) are the Jacobians of \pythoninline{compose} with respect to its first and second argument.
 
     \begin{longhint}
-        Start the recursion from ``no motion, known exactly'': the identity pose \pythoninline{gtsam.Pose2()} and a zero \(3\times3\) covariance. That is also the right answer for an empty list of increments. \pythoninline{gtsam.Pose2.compose} fills in both Jacobians for you if you pass two preallocated \pythoninline{np.zeros((3, 3), order="F")} arrays.
+        Start the recursion from the identity pose \pythoninline{gtsam.Pose2()} and a zero \(3\times3\) covariance. \pythoninline{compose} fills in both Jacobians for you if you pass it two arrays preallocated as \pythoninline{np.zeros((3, 3), order="F")}.
     \end{longhint}
     \begin{solution} \input{py/gtsam/b/solu.tex} \end{solution}
 
     % ------------------------------------------------------------------ (c)
     \breakans
-    \part Build the graph. Each factor you add is literally one term of the negative log posterior (9.4), and therefore one term of the cost function (9.6) that the back-end minimizes.
+    \part Build the graph. Each factor you add is one term of the negative log posterior (9.4).
     \begin{subparts}
         \subpart Implement \input{py/gtsam/c1/def.tex}, which returns the predicted pose
         \[
-            \hat{x}_k = \hat{x}_{k-1} \oplus u_k :
+            \hat{x}_k = \hat{x}_{k-1} \oplus u_k,
         \]
-        the previous pose estimate compounded with the odometry increment \(u_k\), which is expressed in the body frame of \(x_{k-1}\). In words: rotate the increment's translation by the previous heading and add it to the previous position, and add the two headings. The compounding \(\oplus\) is the inverse of the \(\ominus\) in (9.5); for a \pythoninline{gtsam.Pose2} it is \pythoninline{compose}.
+        the previous pose estimate compounded with the odometry increment \(u_k\), which is expressed in the body frame of \(x_{k-1}\). For a \pythoninline{gtsam.Pose2}, \(\oplus\) is \pythoninline{compose}.
 
-        The prediction is only the starting value for the new variable \(x_k\): (9.13) is solved iteratively, so every variable needs one. It adds no information to the graph; the odometry factor in the next part does that.
+        Unlike the prediction step of an EKF, this prediction does not alter the estimate. It only gives the optimizer a starting guess for the new pose \(x_k\), which an iterative solver needs for every variable. What connects \(x_k\) to \(x_{k-1}\) is the odometry factor you add in (c2).
         \begin{solution} \input{py/gtsam/c1/solu.tex} \end{solution}
 
         \subpart Implement \input{py/gtsam/c2/def.tex}, adding the middle term of (9.6) as a \pythoninline{BetweenFactorPose2}.
         \begin{longhint}
             The factor is constructed as
             \begin{center}\pythoninline{gtsam.BetweenFactorPose2(key_previous, key_current, measured, noise_model)}\end{center}
-            and \pythoninline{graph.add(factor)} adds it to the graph. Use \pythoninline{gtsam.noiseModel.Gaussian.Covariance} and not \pythoninline{.Sigmas}: the covariance you preintegrated in (b) is not diagonal, and discarding its off-diagonal terms is an easy way to end up over-confident and inconsistent.
+            and \pythoninline{graph.add(factor)} adds it to the graph. Use \pythoninline{gtsam.noiseModel.Gaussian.Covariance}, which takes the full \(3\times3\) matrix, and not \pythoninline{.Sigmas}, which takes only standard deviations. The covariance you preintegrated in (b) is not diagonal. A heading error also moves the pose sideways, so the two are correlated. Dropping that correlation makes the factor too confident in some directions and not confident enough in others.
         \end{longhint}
         \begin{solution} \input{py/gtsam/c2/solu.tex} \end{solution}
 
@@ -74,7 +67,7 @@ Each part has its own tests, selected by a pytest marker named after the part: \
         \begin{longhint}
             The factor is constructed as
             \begin{center}\pythoninline{gtsam.BearingRangeFactor2D(pose_key, landmark_key, bearing, range, noise_model)}\end{center}
-            with the bearing \emph{first}, as a \pythoninline{gtsam.Rot2} (\pythoninline{gtsam.Rot2(angle)}), and the range as a float. A plain float bearing raises a \pythoninline{TypeError}. The noise model you are handed is already ordered [bearing, range] to match.
+            with the bearing \emph{first}, as a \pythoninline{gtsam.Rot2(angle)}, and the range as a float. A plain float bearing raises a \pythoninline{TypeError}. The noise model you are handed is already ordered [bearing, range] to match.
         \end{longhint}
         \begin{solution} \input{py/gtsam/c3/solu.tex} \end{solution}
     \end{subparts}
@@ -127,8 +120,6 @@ Each part has its own tests, selected by a pytest marker named after the part: \
         }
     \]
     \(H\) is dense in its three leftmost columns, because every measurement depends on the pose, and block diagonal elsewhere, because measurement \(i\) depends only on landmark \(i\). \(R\) is \pythoninline{measurement_cov} repeated \(n\) times along its diagonal, since the measurements are independent.
-
-    % Note that \(P\) contains the cross-covariances \emph{between landmarks}. Those cross terms are the entire reason JCBB can be joint rather than a sequence of independent gates: they are what makes a set of individually plausible associations collectively implausible. % TODO: I dont think this paragraph is necessary 
 
     \begin{solution} \input{py/gtsam/f/solu.tex} \end{solution}
 

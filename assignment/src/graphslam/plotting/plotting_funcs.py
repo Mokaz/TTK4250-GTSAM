@@ -733,6 +733,7 @@ def plot_landmark_nis(
     anis_per_dof = np.sum(nis) / D
 
     anis_lower, anis_upper = average_interval(D, D)
+    inlier_pct = 100.0 * np.mean((nis_per_dof >= nis_lower) & (nis_per_dof <= nis_upper))
 
     ax.plot(steps, nis_per_dof, lw=1.2, color="steelblue", label=r"$\bar{\epsilon}_{k,\mathrm{lm}}$")
     ax.axhline(1.0, lw=1.0, ls=":", color="tomato", label=r"$\mathbb{E}[\bar{\epsilon}_{k,\mathrm{lm}}]=1$")
@@ -744,7 +745,7 @@ def plot_landmark_nis(
         rf"$95\%$ interval: $[{anis_lower:.2f},\,{anis_upper:.2f}]$"
     )
     ax.text(0.98, 0.95, anis_text, transform=ax.transAxes, ha="right", va="top", fontsize=8, bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
-    ax.set_title(r"Landmark measurement NIS per degree of freedom")
+    ax.set_title(f"Landmark measurement NIS per degree of freedom ({inlier_pct:.1f}% inside the {CONFIDENCE:.0%} bounds)")
     ax.set_xlabel(r"Scan step $k$")
     ax.set_ylabel(r"$\bar{\epsilon}_{k,\mathrm{lm}}$")
     ax.legend(loc="upper left", fontsize=8)

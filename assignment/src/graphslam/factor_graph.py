@@ -186,7 +186,9 @@ def predict_measurement(
     H_bearing_landmark = np.zeros((1, 2), order="F")
 
     predicted_range = pose.range(landmark, H_range_pose, H_range_landmark)
-    predicted_bearing = pose.bearing(landmark, H_bearing_pose, H_bearing_landmark).theta()
+    predicted_bearing = pose.bearing(
+        landmark, H_bearing_pose, H_bearing_landmark
+    ).theta()
 
     z = np.array([predicted_range, predicted_bearing])
     H_pose = np.vstack((H_range_pose, H_bearing_pose))
@@ -214,7 +216,9 @@ def inverse_measurement(pose: gtsam.Pose2, measurement: np.ndarray) -> np.ndarra
     # TODO(g): rotate by the bearing, translate by the range, map to the world frame.
     # BEGIN SOLUTION
     measured_range, measured_bearing = float(measurement[0]), float(measurement[1])
-    landmark_body = gtsam.Rot2(measured_bearing).rotate(gtsam.Point2(measured_range, 0.0))
+    landmark_body = gtsam.Rot2(measured_bearing).rotate(
+        gtsam.Point2(measured_range, 0.0)
+    )
     landmark_world = pose.transformFrom(landmark_body)
     return np.asarray(landmark_world, dtype=float).reshape(2)
     # END SOLUTION

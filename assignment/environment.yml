@@ -1,12 +1,12 @@
 # Environment for TTK4250 Group Assignment 2.
 #
 #   conda env create -f environment.yml
-#   conda activate ttk4250
+#   conda activate ttk4250_ga2
 #   pip install -e . --no-deps
 #
 # Everything comes from conda-forge, which publishes GTSAM 4.3 for Windows,
 # Linux and macOS. PyPI does not ship a Windows wheel for GTSAM, which is why
-# this file and not `pip install` or `uv sync` is the supported setup.
+# this file and not `pip install` is the supported setup.
 #
 # "nodefaults" matters if you have full Anaconda installed: without it the
 # `defaults` channel can win the solve and pull incompatible builds.

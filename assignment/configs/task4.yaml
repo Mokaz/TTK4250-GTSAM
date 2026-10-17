@@ -1,0 +1,39 @@
+# Task 4: the baseline from sim_default.yaml with one wrong association
+# forced at step 600. Run it, then set robust_kernel to huber and run again.
+noise:
+  sigma_odom_x: 0.01
+  sigma_odom_y: 0.01
+  sigma_odom_yaw_deg: 0.5
+  sigma_range: 0.2
+  sigma_bearing_deg: 2.0
+  sigma_init_pose_x: 0.001       # the run starts exactly at the true pose
+  sigma_init_pose_y: 0.001
+  sigma_init_pose_yaw_deg: 0.001
+sensor:                          # sensor limits, not tuning values
+  max_range: 80.0                # how far the sensor sees [m]
+  range_local: 85.0              # local map offered to association: reach plus a margin
+  bearing_local_deg: 125.0
+tentative:                       # landmark birth: seen in M of the last N steps
+  M: 2
+  N: 3
+  gate: 0.5
+association:
+  method: jcbb
+  alpha_individual: 0.9999
+  alpha_joint: 0.999
+  inject_wrong_at_step: 600      # re-pair one measurement with the wrong landmark here
+backend:
+  solver: isam2
+  relinearize_threshold: 0.1
+  relinearize_skip: 10
+  covariance_method: bayes_tree
+  robust_kernel: none            # set to huber for the second run
+  huber_k: 1.345                 # Huber threshold, in measurement noise standard deviations
+logging:
+  log_association_diagnostics: true
+  association_stride: 1
+  association_steps: []
+  log_snapshot: false
+  snapshot_stride: 1
+  snapshot_steps: []
+  log_error: false

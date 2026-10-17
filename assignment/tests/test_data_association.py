@@ -110,7 +110,7 @@ def test_nis_is_zero_for_a_perfect_association() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Task 4(b): forcing one wrong association
+# Task 4: forcing one wrong association
 # ---------------------------------------------------------------------------
 
 

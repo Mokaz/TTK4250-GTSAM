@@ -301,15 +301,15 @@ def run_slam(
             diagnostics.duration_association = time.perf_counter() - t0
 
             if k == config.association.inject_wrong_at_step:
-                # Task 4(b): one deliberate wrong association.
+                # Task 4: one deliberate wrong association.
                 forced = force_wrong_association(
                     association, measurements, local_map.predicted_measurements
                 )
                 changed = not np.array_equal(forced, association)
                 tqdm.write(
-                    f"Task 4(b): forced one wrong association at step {k}."
+                    f"Task 4: forced one wrong association at step {k}."
                     if changed
-                    else f"Task 4(b): nothing to re-pair at step {k}; choose another step."
+                    else f"Task 4: nothing to re-pair at step {k}; choose another step."
                 )
                 association = forced
 

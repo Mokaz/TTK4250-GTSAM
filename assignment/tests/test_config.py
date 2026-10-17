@@ -18,10 +18,20 @@ from graphslam.config import (
 CONFIGS = Path(__file__).resolve().parents[1] / "configs"
 
 
-@pytest.mark.parametrize("name", ["sim_default.yaml", "real_default.yaml", "default_config.yaml"])
+@pytest.mark.parametrize("name", ["sim_default.yaml", "real_default.yaml", "default_config.yaml", "task4.yaml"])
 def test_shipped_configs_load(name: str) -> None:
     config = SlamConfig.load(CONFIGS / name)
     assert isinstance(config, SlamConfig)
+
+
+def test_task4_config_is_the_sim_baseline_with_one_forced_mistake() -> None:
+    task4 = SlamConfig.load(CONFIGS / "task4.yaml")
+    baseline = SlamConfig.load(CONFIGS / "sim_default.yaml")
+    assert task4.association.inject_wrong_at_step == 600
+    assert task4.backend.robust_kernel == "none"
+
+    task4.association.inject_wrong_at_step = None
+    assert task4 == baseline, "configs/task4.yaml must match sim_default.yaml apart from the forced mistake"
 
 
 def test_default_config_matches_the_dataclass_defaults() -> None:
