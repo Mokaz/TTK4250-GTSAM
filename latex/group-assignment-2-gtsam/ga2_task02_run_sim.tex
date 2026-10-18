@@ -14,7 +14,7 @@ The initial tuning is in \pythoninline{configs/sim_default.yaml}. Everything mar
 \begin{center}
     \pythoninline{run_sim --output-dir runs/sim/baseline}
 \end{center}
-For each tuning set, copy \pythoninline{configs/sim_default.yaml} to a new file, change its values, and run it with \pythoninline{--config} pointing at that file and its own \pythoninline{--output-dir}. A run takes about 10--15 seconds. The run directory keeps the figures, the config used and the summary (in \pythoninline{metadata.json}). \pythoninline{plot_run <run directory>} re-plots a finished run, and \pythoninline{--no-show-plots} skips the plot windows.
+For each tuning set, copy \pythoninline{configs/sim_default.yaml} to a new file in \pythoninline{configs/}, change its values, and run it with \pythoninline{--config} pointing at that file and its own \pythoninline{--output-dir}. A run takes about 10--15 seconds. The run directory keeps the figures, the config used and the summary (in \pythoninline{metadata.json}). \pythoninline{plot_run <run directory>} re-plots a finished run, and \pythoninline{--no-show-plots} skips the plot windows.
 
 Find 3 sets of tuning values that differ from the baseline in different ways, and explain the results you get with them. For example:
 \begin{itemize}

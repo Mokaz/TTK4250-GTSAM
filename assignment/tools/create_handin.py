@@ -2,12 +2,12 @@
 
 Run from the root of your handout::
 
-    python create_handin.py
+    python create_handin.py --group 17
 
 It collects the source files you edited plus the tuning configs you used, and
 writes ``handin_<group>.zip`` next to this script. Nothing else is included --
-run directories and figures are yours to keep, and the report is uploaded
-separately as a pdf.
+run directories and figures are yours to keep, and the report is a
+separate pdf.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent
 
 INCLUDE_GLOBS = [
     "src/graphslam/**/*.py",
-    "configs/*.yaml",
+    "configs/**/*.yaml",
 ]
 
 EXCLUDE_PARTS = {"__pycache__", ".pytest_cache", ".venv", "runs", "figures"}
@@ -52,7 +52,7 @@ def main() -> None:
     print(f"Wrote {archive.name} with {len(files)} files:")
     for path in files:
         print(f"  {path.relative_to(ROOT)}")
-    print("\nUpload this zip under 'Group Assignment 2 code' on Canvas.")
+    print("\nUpload this zip under 'Group Assignment 2' on Canvas, together with the report.")
 
 
 if __name__ == "__main__":
