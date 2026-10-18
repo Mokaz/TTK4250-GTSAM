@@ -146,6 +146,12 @@ def test_the_landmark_nis_figure_reports_the_share_inside_its_bounds(plotted_run
     )
 
 
+def _nis_values(ax) -> np.ndarray:
+    """The plotted NIS values: the first line, without the NaNs that break it at gaps."""
+    values = np.asarray(ax.lines[0].get_ydata(), dtype=float)
+    return values[np.isfinite(values)]
+
+
 @needs_data
 def test_position_nis_plot_runs(plotted_run: Path) -> None:
     """The one plot the simulated set cannot reach on its own.
@@ -174,7 +180,7 @@ def test_position_nis_plot_runs(plotted_run: Path) -> None:
         poses_times=times,
     )
 
-    assert ax.collections, "the NIS scatter should have been drawn"
+    assert ax.lines, "the NIS line should have been drawn"
     plt.close(fig)
 
 
@@ -198,7 +204,7 @@ def test_position_nis_ignores_gnss_outside_the_run() -> None:
 
     fig, ax = plot_position_nis(gnss=gnss, poses=poses, poses_covs=poses_covs, poses_times=times)
 
-    nis = ax.collections[0].get_offsets()[:, 1]
+    nis = _nis_values(ax)
     assert len(nis) == 10, f"only the 10 GNSS samples inside the run should be used, got {len(nis)}"
     np.testing.assert_allclose(nis, 0.0, atol=1e-12)
     plt.close(fig)
@@ -217,7 +223,7 @@ def test_position_nis_uses_the_configured_gnss_sigma() -> None:
         gnss=gnss, poses=poses, poses_covs=poses_covs, poses_times=times, sigma_gnss=2.0
     )
 
-    nis = ax.collections[0].get_offsets()[:, 1]
+    nis = _nis_values(ax)
     np.testing.assert_allclose(nis, (1.0 / 2.0) ** 2)
     plt.close(fig)
 

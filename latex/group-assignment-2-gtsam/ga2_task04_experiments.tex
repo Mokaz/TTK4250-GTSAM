@@ -4,9 +4,9 @@ In this short task, we will look at what happens when a data association is wron
 
 The config \pythoninline{configs/task4.yaml} sets \pythoninline{inject_wrong_at_step: 600} under \pythoninline{association}, which re-pairs one measurement with the wrong landmark at step 600. Everything else is the same as in \pythoninline{configs/sim_default.yaml}, the default tuning from Task~\ref{q:task02}. Run it with
 \begin{center}
-    \pythoninline{run_sim --config configs/task4.yaml --output-dir runs/task4}
+    \pythoninline{run_sim --config configs/task4.yaml --output-dir runs/sim/task4}
 \end{center}
-and explain what this single wrong association does to the trajectory and the map, using the error values and landmark counts from the run summary. How does the NIS behave at step 600 and in the steps after it, and why?
+and compare it with your baseline run from Task~\ref{q:task02}: explain what this single wrong association does to the trajectory and the map, using the error values and landmark counts from the run summary. How does the NIS behave at step 600 and in the steps after it, and why?
 
 The Huber loss is a robust loss function (GTSAM calls it a robust kernel, hence the config name) that is quadratic for small errors and linear for large ones:
 \[
@@ -26,7 +26,7 @@ where \(\|h(x_k, m^i) - z^i_k\|_R\) is the measurement error normalized by the m
 
 Edit \pythoninline{configs/task4.yaml}: set \pythoninline{backend.robust_kernel: huber}, and run the simulation again with
 \begin{center}
-    \pythoninline{run_sim --config configs/task4.yaml --output-dir runs/task4_huber}
+    \pythoninline{run_sim --config configs/task4.yaml --output-dir runs/sim/task4_huber}
 \end{center}
 Explain how this changes the cost function (9.6) for the wrong measurement, and why that helps.
 

@@ -1,40 +1,46 @@
 \titledquestion{Run factor graph SLAM on simulated data}
 \label{q:task02}
-You are given a data set consisting of
+The simulated dataset consists of
 \begin{itemize}
-    \item odometry (K, 3): the measured movement of the robot in body frame
-    \item z (K,): Python list of detections at each time step. Each detection is (\#measurements, 2).
-    \item poseGT (K, 3): the pose ground truth at each time step
-    \item landmarks (M, 2): the ground truth landmarks
+    \item odometry (K, 3): the measured movement of the robot in its body frame,
+    \item z (K,): a list of the detections at each time step, each of shape (number of measurements, 2),
+    \item poseGT (K, 3): the true pose at each time step,
+    \item landmarks (L, 2): the true landmark positions.
 \end{itemize}
 
-We have given you initial tuning values in \pythoninline{configs/sim_default.yaml}; everything marked \pythoninline{# TODO tune} is yours to change. They are a \emph{working baseline}: the run completes, but the estimate is neither accurate nor consistent. The pose NEES sits well above its expected value, and the landmark NIS well below it. With a correct Task~\ref{q:task01}, these values map 72 of the 78 true landmarks, with 3 spurious ones, and give a pose ANEES of 8.37; the run is deterministic, so if yours differs, look at Task~\ref{q:task01} before you start tuning. We want you to find 3 different sets of tuning values that differ in different ways and explain the results you get using them.
+The initial tuning is in \pythoninline{configs/sim_default.yaml}. Everything marked \pythoninline{# TODO tune} is yours to change. It is a \emph{working baseline}: the run completes and the map is mostly right, but there is room for improvement in both accuracy and consistency. The pose NEES sits above its expected value, and the landmark NIS below it. With a correct Task~\ref{q:task01}, the baseline maps 72 of the 78 true landmarks, with 3 spurious ones, and gives a pose ANEES of 8.37. The run is deterministic, so if yours differs, check Task~\ref{q:task01} before you start tuning.
+
+\paragraph{Running.} From the handout folder, run the baseline with
+\begin{center}
+    \pythoninline{run_sim --output-dir runs/sim/baseline}
+\end{center}
+For each tuning set, copy \pythoninline{configs/sim_default.yaml} to a new file, change its values, and run it with \pythoninline{--config} pointing at that file and its own \pythoninline{--output-dir}. A run takes about 10--15 seconds. The run directory keeps the figures, the config used and the summary (in \pythoninline{metadata.json}). \pythoninline{plot_run <run directory>} re-plots a finished run, and \pythoninline{--no-show-plots} skips the plot windows.
+
+Find 3 sets of tuning values that differ from the baseline in different ways, and explain the results you get with them. For example:
+\begin{itemize}
+    \item a set that performs better than the baseline in some way,
+    \item a set with similar errors but poor consistency,
+    \item a set that maps noticeably fewer landmarks, and how that affects the trajectory.
+\end{itemize}
 
 Every run prints a summary of the averaged NEES and NIS (the landmark ANIS per degree of freedom, since the number of associated landmarks varies). To judge consistency, compare each average with its expected value, and check that about 95\% of the per-step values fall inside their bounds. Do not rely on the 95\% interval of the average alone: (4.67) assumes independent errors, but the errors of neighbouring poses in a smoother are strongly correlated, so even with the correct noise, one run's ANEES can land anywhere between about 1.5 and 8.
 
-An example of three different sets of tuning values could be
+Every simulated run also prints a map-quality summary, which compares the map with the true landmarks. Each map landmark is paired with at most one true landmark, closest pairs first and only within 3\,m, and only the true landmarks the run actually observed are counted:
 \begin{itemize}
-    \item a set that gives better performance than the initial tuning values in some way
-    \item a set that gives similar performance in terms of error but bad performance in terms of consistency
-    \item a set that maps noticeably fewer landmarks, and how that affects the trajectory
+    \item \emph{Mapped}: a true landmark with a map landmark paired to it. The RMS position error is taken over these pairs.
+    \item \emph{Missed}: an observed true landmark with no map landmark paired to it. Either it was never confirmed, because it was not seen in \(M\) of \(N\) steps or its measurements kept being associated elsewhere, or its estimate drifted more than 3\,m away.
+    \item \emph{Duplicate}: an extra map landmark within 3\,m of a true landmark that already has its pair. Data association failed to match a measurement to the landmark already in the map, and a new landmark was born from it instead.
+    \item \emph{Spurious}: a map landmark with no true landmark within 3\,m. It was born from a wrong measurement or a wrong association, or its estimate has drifted far from where the landmark is.
 \end{itemize}
+Duplicates point at the front-end (association and landmark birth); missed and spurious landmarks can come from either end.
+
+\textit{Note}: The runtime of JCBB grows quickly with the number of duplicate landmarks, because each one gives a measurement more candidates to pair with. A tuning that creates duplicates (noise values so small that the gates reject true re-observations, or landmark birth on a single sighting, \(M = N = 1\), with a wrong noise model) can slow a run from seconds to minutes. If a run slows down substantially, stop it with Ctrl+C. The run so far will be saved, and its map-quality summary shows whether duplicates are the cause.
 
 \hfill
 
 Some questions to help discussion (not mandatory to answer):
 \begin{itemize}
-    \item Which types of errors do you see?
-    \item Why do you think the errors are like this?
-    \item Every simulated run reports a map-quality line. Each map landmark is paired with at most one true landmark, closest pairs first and only within 3\,m, and only the true landmarks the run actually observed are counted:
-    \begin{itemize}
-        \item \emph{Mapped}: a true landmark with a map landmark paired to it. The RMS position error is taken over these pairs.
-        \item \emph{Missed}: an observed true landmark with no map landmark paired to it. Either it was never confirmed, because it was not seen in \(M\) of \(N\) steps or its measurements kept being associated elsewhere, or its estimate drifted more than 3\,m away.
-        \item \emph{Duplicate}: an extra map landmark within 3\,m of a true landmark that already has its pair. Data association failed to match a measurement to the landmark already in the map, and a new landmark was born from it instead.
-        \item \emph{Spurious}: a map landmark with no true landmark within 3\,m. It was born from a wrong measurement or a wrong association, or its estimate has drifted far from where the landmark is.
-    \end{itemize}
-    Duplicates point at the front-end (association and landmark birth); missed and spurious landmarks can be either. Use these numbers to judge how much of your error the front-end is responsible for, and how much the back-end. (Sec.\ 9.1)
-    \item Would you say that there are any shortcomings of the algorithm on this data set?
+    \item Which types of errors do you see, and why do you think they look like this?
+    \item How much of your error is the front-end responsible for, and how much the back-end (Sec.\ 9.1)? Use the map-quality numbers.
+    \item Would you say that there are any shortcomings of the algorithm on this dataset?
 \end{itemize}
-
-\textit{Note}: The runtime of JCBB grows quickly with the number of duplicate landmarks, because each one gives a measurement more candidates to pair with. A tuning that creates duplicates (noise values the gates cannot cope with, or landmark birth on a single sighting, \(M = N = 1\), with a wrong noise model) can slow a run from seconds to minutes. Watch the map-quality line and how many new landmarks appear.
-The local map, \pythoninline{sensor.range_local} and \pythoninline{sensor.bearing_local_deg}, is not a tuning value: it is set from what the sensor can see, with a margin. Making it smaller hides landmarks the sensor does see from data association, so their measurements become duplicate landmarks, and the run can slow down to the point of hanging.

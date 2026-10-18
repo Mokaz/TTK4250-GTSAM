@@ -254,8 +254,11 @@ run is the one Task 3 asks for; it diverges completely and takes twice as long.
   says the baseline is good but inconsistent, that a better set improves
   consistency without losing accuracy, and that a broken run should be
   described and explained, noting that not every break has the same cause.
-  The required lower-odometry set is called "the obvious first guess", not
-  the fix, and the `preintegrate` hint is tied to it alone. Both shipped
+  The required lower-odometry set is no longer presented as the fix, and
+  the `preintegrate` / correlated-wheel-error hint was dropped (18 Oct):
+  students only have to try to explain a break, so the hint is not
+  needed. The answer for the solving guide: independent-increment
+  odometry grows like sqrt(N), correlated wheel errors like N. Both shipped
   configs say an alpha is a confidence, closer to 1 a looser gate, so the
   best set (tight R, both gates 0.999999) is reachable. "Plan your runs" no longer claims 2000 steps
   predict the full run: odometry 0.5 m with R 0.1 m / 0.1 deg is 1.49 m at

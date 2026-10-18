@@ -542,6 +542,60 @@ def plot_pose_diagnostics(
     return fig, axes
 
 
+def _plot_consistency(
+    ax: plt.Axes,
+    steps: np.ndarray,
+    values: np.ndarray,
+    lower: np.ndarray | float,
+    upper: np.ndarray | float,
+    expected: float,
+    title: str,
+    ylabel: str,
+    average_text: str,
+    interval: tuple[float, float],
+    extra_text: str | None = None,
+) -> None:
+    """Draw one NEES/NIS figure in the shared style.
+
+    The per-step values as a line, the 95% bounds dashed, the expected value
+    dotted; the average with its interval in a box, and the share of values
+    inside the bounds in the title.
+    """
+    steps = np.asarray(steps, dtype=float)
+    values = np.asarray(values, dtype=float)
+    constant_bounds = np.ndim(lower) == 0
+    lower = np.broadcast_to(np.asarray(lower, dtype=float), values.shape)
+    upper = np.broadcast_to(np.asarray(upper, dtype=float), values.shape)
+    inside_pct = 100.0 * np.mean((values >= lower) & (values <= upper))
+
+    # Break the lines across long gaps (GNSS dropouts) instead of bridging them.
+    if len(steps) > 2:
+        gaps = np.diff(steps)
+        breaks = np.flatnonzero(gaps > 10 * np.median(gaps)) + 1
+        steps, values, lower, upper = (np.insert(a, breaks, np.nan) for a in (steps, values, lower, upper))
+
+    ax.plot(steps, values, lw=1.0, color="steelblue", label=ylabel)
+    bound_style = dict(lw=1.0, ls="--")
+    if constant_bounds:
+        ax.axhline(lower[0], color="orange", label=f"Lower {CONFIDENCE:.0%} bound", **bound_style)
+        ax.axhline(upper[0], color="tomato", label=f"Upper {CONFIDENCE:.0%} bound", **bound_style)
+    else:
+        ax.plot(steps, lower, color="orange", label=f"Lower {CONFIDENCE:.0%} bound", **bound_style)
+        ax.plot(steps, upper, color="tomato", label=f"Upper {CONFIDENCE:.0%} bound", **bound_style)
+    ax.axhline(expected, lw=1.0, ls=":", color="0.3", label=f"Expected value ({expected:g})")
+
+    text = f"{average_text}\n{CONFIDENCE:.0%} interval: [{interval[0]:.2f}, {interval[1]:.2f}]"
+    if extra_text:
+        text += f"\n{extra_text}"
+    ax.text(0.98, 0.95, text, transform=ax.transAxes, ha="right", va="top", fontsize=8,
+            bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
+    ax.set_title(f"{title} ({inside_pct:.1f}% inside the {CONFIDENCE:.0%} bounds)")
+    ax.set_xlabel("Scan step")
+    ax.set_ylabel(ylabel)
+    ax.grid(True, lw=0.4)
+    ax.legend(loc="upper left", fontsize=8)
+
+
 def plot_pose_nees(
     poses: np.ndarray,
     poses_gt: np.ndarray,
@@ -553,31 +607,16 @@ def plot_pose_nees(
     fig, ax = _ensure_ax(ax, figsize=(8, 3))
 
     n = len(poses)
-
-    poses_gt = poses_gt[:n]
-
-    nees = pose_nees(poses, poses_gt, poses_covs)
+    nees = pose_nees(poses, poses_gt[:n], poses_covs)
     anees = np.sum(nees) / n
 
-    lower_bound, upper_bound = chi2_bounds(3)
-    anees_lower, anees_upper = average_interval(3 * n, n)
-    inlier_mask = (nees >= lower_bound) & (nees <= upper_bound)
-    inlier_pct = 100.0 * np.mean(inlier_mask)
-
-    ax.plot(nees, color="steelblue", label="NEES")
-    ax.axhline(lower_bound, ls="--", c="orange", label=rf"$\chi^2_3$ lower {CONFIDENCE:.0%} bound")
-    ax.axhline(upper_bound, ls="--", c="tomato", label=rf"$\chi^2_3$ upper {CONFIDENCE:.0%} bound")
-    anees_text = (
-        f"ANEES = {anees:.2f} (expected 3)\n"
-        f"{CONFIDENCE:.0%} interval: [{anees_lower:.2f}, {anees_upper:.2f}]"
+    lower, upper = chi2_bounds(3)
+    _plot_consistency(
+        ax, np.arange(n), nees, lower, upper, expected=3,
+        title="Pose NEES", ylabel="NEES",
+        average_text=f"ANEES = {anees:.2f} (expected 3)",
+        interval=average_interval(3 * n, n),
     )
-    ax.text(0.98, 0.95, anees_text, transform=ax.transAxes, ha="right", va="top", fontsize=8, bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
-    ax.set_xlabel("Scan step")
-    ax.set_ylabel("NEES")
-    ax.set_title(f"Pose NEES ({inlier_pct:.1f}% inside the {CONFIDENCE:.0%} bounds)")
-    ax.grid(True, lw=0.4)
-    ax.legend(loc="upper left", fontsize=8)
-
     return fig, ax
 
 
@@ -595,31 +634,20 @@ def plot_position_nis(
     by ``noise.sigma_gnss`` in the config. The NIS treats GNSS as a measurement
     of the position with covariance ``sigma_gnss**2 * I``.
     """
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 3), tight_layout=True)
-    else:
-        fig = ax.figure
+    fig, ax = _ensure_ax(ax, figsize=(8, 3))
 
     nis_xy, nearest_pose_indices, _ = gnss_nis(gnss, poses, poses_covs, poses_times, sigma_gnss)
-    anis_xy = np.sum(nis_xy) / len(nis_xy)
+    n = len(nis_xy)
+    anis_xy = np.sum(nis_xy) / n
 
-    nis_lower, nis_upper = chi2_bounds(2)
-    anis_lower, anis_upper = average_interval(2 * len(nis_xy), len(nis_xy))
-    inliers = np.count_nonzero((nis_xy >= nis_lower) & (nis_xy <= nis_upper))
-    inlier_frac = inliers / len(nis_xy)
-
-    ax.scatter(nearest_pose_indices, nis_xy, s=5, color="steelblue", label=r"$\mathrm{NIS}_{xy}$")
-    ax.axhline(nis_upper, ls="--", c="tomato", lw=1, label=rf"$\chi^2_2$ upper {CONFIDENCE:.0%} bound")
-    ax.axhline(nis_lower, ls="--", c="orange", lw=1, label=rf"$\chi^2_2$ lower {CONFIDENCE:.0%} bound")
-    ax.set_xlabel("Scan step")
-    ax.set_ylabel(r"NIS")
-    ax.set_title(
-        f"NIS-position | ANIS = {anis_xy:.2f}, {CONFIDENCE:.0%} interval [{anis_lower:.2f}, {anis_upper:.2f}]"
-        f" | {inlier_frac:.0%} inside bounds | GNSS sigma = {sigma_gnss:g} m"
+    lower, upper = chi2_bounds(2)
+    _plot_consistency(
+        ax, nearest_pose_indices, nis_xy, lower, upper, expected=2,
+        title="GPS position NIS", ylabel="NIS",
+        average_text=f"ANIS = {anis_xy:.2f} (expected 2)",
+        interval=average_interval(2 * n, n),
+        extra_text=f"Assumed GPS sigma = {sigma_gnss:g} m",
     )
-    ax.grid(True, lw=0.4)
-    ax.legend()
-
     return fig, ax
 
 def plot_association(
@@ -722,33 +750,16 @@ def plot_landmark_nis(
 
     nis, dofs, steps = landmark_nis(diagnostics)
 
-    # Per-step NIS per degree of freedom
-    nis_per_dof = nis / dofs
-
-    nis_lower, nis_upper = chi2_bounds(dofs)
-    nis_lower, nis_upper = nis_lower / dofs, nis_upper / dofs
-
-    # Aggregate NIS per degree of freedom
+    # Per scan, and averaged, per degree of freedom: the number of associated
+    # landmarks, and so the dimension of the NIS, changes from scan to scan.
+    lower, upper = chi2_bounds(dofs)
     D = int(np.sum(dofs))
     anis_per_dof = np.sum(nis) / D
 
-    anis_lower, anis_upper = average_interval(D, D)
-    inlier_pct = 100.0 * np.mean((nis_per_dof >= nis_lower) & (nis_per_dof <= nis_upper))
-
-    ax.plot(steps, nis_per_dof, lw=1.2, color="steelblue", label=r"$\bar{\epsilon}_{k,\mathrm{lm}}$")
-    ax.axhline(1.0, lw=1.0, ls=":", color="tomato", label=r"$\mathbb{E}[\bar{\epsilon}_{k,\mathrm{lm}}]=1$")
-    ax.plot(steps, nis_upper, lw=1.0, ls=":", color="tab:green", label=r"$\chi^2_{d_{k,\mathrm{lm}},\,0.975}/d_{k,\mathrm{lm}}$")
-    ax.plot(steps, nis_lower, lw=1.0, ls=":", color="orange", label=r"$\chi^2_{d_{k,\mathrm{lm}},\,0.025}/d_{k,\mathrm{lm}}$")
-    anis_text = (
-        rf"$\bar{{\epsilon}}_{{\mathrm{{ANIS,lm}}}} = {anis_per_dof:.2f}$"
-        "\n"
-        rf"$95\%$ interval: $[{anis_lower:.2f},\,{anis_upper:.2f}]$"
+    _plot_consistency(
+        ax, steps, nis / dofs, lower / dofs, upper / dofs, expected=1,
+        title="Landmark NIS per degree of freedom", ylabel="NIS per DOF",
+        average_text=f"ANIS = {anis_per_dof:.2f} per DOF (expected 1)",
+        interval=average_interval(D, D),
     )
-    ax.text(0.98, 0.95, anis_text, transform=ax.transAxes, ha="right", va="top", fontsize=8, bbox=dict(facecolor="white", alpha=0.85, edgecolor="none"))
-    ax.set_title(f"Landmark measurement NIS per degree of freedom ({inlier_pct:.1f}% inside the {CONFIDENCE:.0%} bounds)")
-    ax.set_xlabel(r"Scan step $k$")
-    ax.set_ylabel(r"$\bar{\epsilon}_{k,\mathrm{lm}}$")
-    ax.legend(loc="upper left", fontsize=8)
-    ax.grid(True, lw=0.4)
-
     return fig, ax
