@@ -1,7 +1,5 @@
-"""Factor graph construction, measurement prediction and covariance recovery.
-
-The functions marked ``TODO`` are Task 1 (c) to (g); the assignment text
-explains each one. The rest of this file is given.
+"""Factor graph construction, measurement prediction and covariance assembly.
+Functions marked ``TODO`` are Task 1 (c) to (g); the rest is given.
 """
 
 from __future__ import annotations
@@ -32,13 +30,8 @@ def prior_noise_model(config: SlamConfig) -> gtsam.noiseModel.Base:
 
 
 def bearing_range_noise_model(config: SlamConfig) -> gtsam.noiseModel.Base:
-    """Noise model for landmark observations.
-
-    Careful: ``BearingRangeFactor2D`` expects **bearing first, then range**,
-    while ``config.noise.range_bearing_cov_matrix`` and every measurement array
-    in this code base are ordered **[range, bearing]**. Getting this backwards
-    produces a system that still runs, still looks plausible, and is quietly
-    wrong -- so the test suite checks it.
+    """Noise model for landmark factors, ordered [bearing, range] to match
+    ``BearingRangeFactor2D``.
     """
     base = gtsam.noiseModel.Diagonal.Sigmas(
         np.array([config.noise.sigma_bearing_rad, config.noise.sigma_range])

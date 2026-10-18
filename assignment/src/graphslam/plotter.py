@@ -5,8 +5,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-# On Windows, Qt warns that it cannot set the DPI mode when the terminal has
-# already set it ("SetProcessDpiAwarenessContext() failed"). It is harmless.
+# Silence a harmless Qt DPI warning on Windows.
 os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.window=false")
 
 import matplotlib.pyplot as plt
@@ -285,20 +284,6 @@ class SlamRunPlotter:
         return fig, ax
     
     
-    # def plot_association(self, save: bool = True, fmt: str = "pdf") -> None:
-    #     if not self.association:
-    #         print("No association diagnostics found, skipping association plot.")
-    #         return
-        
-    #     for diag in self.association:
-    #         scan_step = int(diag["scan_step"][0])
-    #         fig = plot_association(
-    #             diagnostics=diag,
-    #             show_covariances=True,
-    #             alpha_individual=self.config.association.alpha_individual,
-    #             alpha_joint=self.config.association.alpha_joint,
-    #         )
-    #         self._finish_figure(fig, f"association_scan_{scan_step:03d}", save, show=False)
 
     
     def plot_all(self, save: bool = True, show: bool = True):
@@ -336,8 +321,6 @@ def main() -> None:
     
 
 if __name__ == "__main__":
-    # plotter = SlamRunPlotter.from_run("runs/real/20260527_224117")
-    # plotter.plot_all(save=True, show=True)
     
     main()
     

@@ -1,7 +1,5 @@
-"""Typed configuration for a SLAM run. Nothing here is graded.
-
-Every value marked ``# TODO tune`` in the shipped YAML files under ``configs/``
-is something you are expected to experiment with in Task 2 and Task 3.
+"""Typed configuration for a SLAM run. Values marked ``# TODO tune`` in
+``configs/`` are yours to tune in Tasks 2 and 3.
 """
 
 from __future__ import annotations
@@ -16,35 +14,17 @@ from omegaconf import OmegaConf
 
 @dataclass
 class NoiseConfig:
-    """Uncertainty parameters.
-
-    The relative pose (odometry) model is
-
-        Delta_T_k = f(u_k) * exp(gamma_k),   gamma_k ~ N(0, Q dt)
-
-    and each increment is preintegrated over a lidar interval before it becomes
-    a single ``BetweenFactorPose2``.
-
-    The landmark measurement model is
-
-        z_kj = h(x_k, m_j) + eta_kj,         eta_kj ~ N(0, R)
-
-    with ``h`` returning [range, bearing]. Note the ordering: GTSAM's
-    ``BearingRangeFactor2D`` wants *bearing before range*, this config and every
-    measurement array in the code use *range before bearing*.
+    """Noise parameters. Measurements are ordered [range, bearing].
 
     Attributes:
-        sigma_odom_x: std. dev. of additive odometry noise in relative x [m].
-        sigma_odom_y: std. dev. of additive odometry noise in relative y [m].
-        sigma_odom_yaw_deg: std. dev. of additive odometry noise in yaw [deg].
-        sigma_range: std. dev. of landmark range noise [m].
-        sigma_bearing_deg: std. dev. of landmark bearing noise [deg].
-        sigma_init_pose_x: std. dev. of the initial pose prior in x [m].
-        sigma_init_pose_y: std. dev. of the initial pose prior in y [m].
-        sigma_init_pose_yaw_deg: std. dev. of the initial pose prior in yaw [deg].
-        sigma_gnss: std. dev. of each GNSS position component [m]. GNSS is never
-            added to the graph; this only sets the reference uncertainty in the
-            position-NIS plot, and with it the vertical scale of that plot.
+        sigma_odom_x, sigma_odom_y: odometry noise in relative x and y [m].
+        sigma_odom_yaw_deg: odometry noise in yaw [deg].
+        sigma_range: landmark range noise [m].
+        sigma_bearing_deg: landmark bearing noise [deg].
+        sigma_init_pose_x, sigma_init_pose_y: initial pose prior in x and y [m].
+        sigma_init_pose_yaw_deg: initial pose prior in yaw [deg].
+        sigma_gnss: assumed GPS accuracy [m]. Only used for the GPS NIS; the GPS
+            never enters the graph.
     """
 
     sigma_odom_x: float = 0.1
@@ -133,19 +113,12 @@ class TentativeLandmarkManagerConfig:
 
 @dataclass
 class SensorConfig:
-    """Sensor and local-map parameters. None of these is a tuning value.
+    """Sensor limits and local map. Not tuning values.
 
-    ``range_local`` and ``bearing_local_deg`` define the local map: which
-    landmarks are predicted, offered to data association, and included in the
-    joint covariance recovered from the graph. Set them from what the sensor can
-    see, plus a margin for pose uncertainty. Smaller, and a landmark the sensor
-    does see is missing from the local map, so its measurement becomes a
-    duplicate landmark; larger only costs time.
-
-    ``max_range`` is how far trees are extracted from a Victoria Park laser scan.
-    It must stay below ``range_local``, or a tree near the limit drops out of the
-    local map whenever the pose estimate is slightly off. The simulated data set
-    comes with its measurements already extracted, so it does not use it.
+    Attributes:
+        max_range: how far trees are extracted from a Victoria Park scan [m].
+        range_local, bearing_local_deg: the local map offered to data
+            association: the sensor's reach plus a margin.
     """
 
     max_range: float = 50.0
@@ -172,13 +145,11 @@ class AssociationConfig:
     """Data association parameters.
 
     Attributes:
-        method: ``"jcbb"``, joint compatibility branch and bound (the only one).
+        method: ``"jcbb"`` (the only one).
         alpha_individual: confidence level of the individual compatibility test.
         alpha_joint: confidence level of the joint compatibility test.
-        inject_wrong_at_step: for Task 4. At this scan step, one associated
-            measurement is deliberately re-paired with the wrong landmark (see
-            ``data_association.force_wrong_association``). ``None`` (the
-            default) leaves association alone.
+        inject_wrong_at_step: Task 4: the scan step at which one association is
+            forced wrong. ``None`` leaves association alone.
     """
 
     method: str = "jcbb"
@@ -206,23 +177,17 @@ class AssociationConfig:
 
 @dataclass
 class BackendConfig:
-    """Factor graph back-end parameters.
+    """Back-end parameters.
 
     Attributes:
-        solver: ``"isam2"`` for incremental smoothing, ``"batch"`` to re-solve
-            the whole graph with Levenberg-Marquardt at every step. ``"batch"``
-            is only usable on the simulated data set -- which is exactly the
-            point of having it (see the book, Sec. 9.3.3 and 9.5).
+        solver: ``"isam2"``, or ``"batch"`` to re-solve the whole graph every
+            step (slow; simulated data only).
         relinearize_threshold: iSAM2 relinearization threshold.
         relinearize_skip: relinearize only every N-th update.
-        covariance_method: how GTSAM recovers the joint marginal covariance --
-            ``"bayes_tree"`` (default: ``isam2.jointMarginalCovariance``, the
-            incremental Bayes-tree query) or ``"marginals"`` (a batch
-            ``gtsam.Marginals`` rebuilt on every call). Both give the same
-            answer; they differ enormously in cost.
-        robust_kernel: ``"none"`` or ``"huber"`` on the landmark measurement
-            factors.
-        huber_k: Huber parameter, in units of the whitened residual.
+        covariance_method: ``"bayes_tree"`` (default) or ``"marginals"``; the same
+            result, the latter is slower.
+        robust_kernel: ``"none"`` or ``"huber"``, on the landmark factors.
+        huber_k: Huber threshold, in measurement noise standard deviations.
     """
 
     solver: str = "isam2"
@@ -262,16 +227,11 @@ class BackendConfig:
 
 @dataclass
 class VictoriaParkConfig:
-    """Settings that only apply to the Victoria Park data set.
+    """Settings for the Victoria Park dataset only.
 
     Attributes:
-        initial_heading_deg: heading of the first pose in the GNSS east/north
-            frame [deg]. The first position is taken from the first GNSS fix,
-            but GNSS gives no heading, so this one is fixed by hand. SLAM cannot
-            observe it -- turning it rotates the whole map and trajectory
-            without changing their shape -- so it matters only for comparing
-            against GNSS. 36 deg is the best-fit rotation of the estimate onto GNSS to within
-            0.01 deg. Its prior std. dev. is ``noise.sigma_init_pose_yaw_deg``.
+        initial_heading_deg: heading of the first pose in the GPS frame [deg].
+            SLAM cannot observe it; it only affects the comparison with the GPS.
     """
 
     initial_heading_deg: float = 36.0

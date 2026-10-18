@@ -1,18 +1,3 @@
-"""The SLAM loop. Given -- you do not need to change anything in this file.
-
-One time step, in the order it happens below:
-
-1. Preintegrate the odometry since the last scan, add the pose and the odometry
-   factor to the graph, and solve (Task 1 a, b, c).
-2. Work out which landmarks are in view and what they should look like from
-   here (Task 1 d).
-3. Recover the joint marginal covariance over the pose and those landmarks, and
-   turn it into an innovation covariance (Task 1 e, f).
-4. Associate the measurements, add a factor for every association, and hand the
-   rest to the landmark manager (Task 1 (g) and (h)).
-5. Solve again, and log.
-"""
-
 from __future__ import annotations
 
 import time
@@ -64,15 +49,7 @@ class SlamDataset(Protocol):
 
 
 class Backend:
-    """Thin wrapper over iSAM2 or a batch Levenberg-Marquardt re-solve.
-
-    The batch solver re-optimizes the entire graph from scratch at every step.
-    It is the honest implementation of (9.13) and it is what iSAM2 is an
-    incremental approximation of, so running both on the simulated data set and
-    comparing the estimates -- and the runtimes -- is the most direct way to see
-    what Sec. 9.3.3 and 9.5 are actually about. Do not try it on Victoria Park
-    unless you have an afternoon to spare.
-    """
+    """Wrapper over iSAM2, or a batch Levenberg-Marquardt re-solve (slow)."""
 
     def __init__(self, config: SlamConfig) -> None:
         self.mode = config.backend.solver
@@ -116,17 +93,10 @@ class Backend:
         return gtsam.Marginals(self.graph, self._estimate).marginalCovariance(key)
 
     def joint_covariance(self, pose_key: int, local_map: fg.LocalMap) -> np.ndarray:
-        """Joint covariance P over [pose] + local landmarks, in that order (Sec. 9.4).
+        """Joint marginal over [pose] + local landmarks, assembled into P by Task 1 (e).
 
-        GTSAM recovers the joint marginal; Task 1 (e) assembles P from it. Two
-        GTSAM routes compute the same quantity, chosen by ``covariance_method``:
-
-        - ``bayes_tree``: ``isam2.jointMarginalCovariance``. GTSAM visits only
-          the cliques on the paths joining the queried variables in the Bayes
-          tree, so the cost tracks how close they are, not the size of the map.
-        - ``marginals``: a ``gtsam.Marginals`` rebuilt from the whole graph on
-          every call. Same answer; its cost grows with the graph. The batch
-          solver always uses this route.
+        ``covariance_method`` picks ``isam2.jointMarginalCovariance`` (``bayes_tree``)
+        or ``gtsam.Marginals`` (``marginals``): the same result, the latter slower.
         """
         keys = [pose_key] + list(local_map.keys)
         query = gtsam.KeyVector(keys)
@@ -199,12 +169,8 @@ def run_slam(
     save_plots: bool = True,
     save_on_abort: bool = True,
 ) -> None:
-    """Run SLAM over ``dataset`` and write the run directory.
-
-    With ``save_on_abort`` (the default), Ctrl+C stops the run but still saves
-    everything up to the last completed step, marked ``"aborted": true`` in
-    ``metadata.json``, so it can be plotted like any other run. Without it,
-    Ctrl+C exits immediately and nothing is saved.
+    """Run SLAM over ``dataset`` and write the run directory. Ctrl+C saves the
+    run so far unless ``save_on_abort`` is False.
     """
     logger = SlamLogger(output_dir, config.logging)
 
@@ -342,10 +308,7 @@ def run_slam(
                 slam.landmark_keys.append(landmark_key)
                 slam.new_values.insert(landmark_key, gtsam.Point2(*landmark.position))
 
-                # Every observation that supported this landmark becomes a factor,
-                # retroactively connecting it to the poses it was seen from. This is
-                # something a filter simply cannot do: the graph keeps the past
-                # around, so evidence can be added to it after the fact.
+                # Every supporting observation becomes a factor, also on past poses.
                 for observation in landmark.supporting_observations:
                     fg.add_landmark_factor(
                         slam.new_factors,
@@ -414,8 +377,7 @@ def run_slam(
 
     from graphslam.plotter import SlamRunPlotter
 
-    # The summary goes out before any plot window opens: showing the figures
-    # blocks until they are closed.
+    # Print the summary before the plot windows, which block until closed.
     plotter = SlamRunPlotter.from_run(output_dir)
     summary = plotter.summary()
     print(summary)

@@ -1,5 +1,3 @@
-"""Small helpers used across the assignment. Nothing here is graded."""
-
 from __future__ import annotations
 
 import gtsam

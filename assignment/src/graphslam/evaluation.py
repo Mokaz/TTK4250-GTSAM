@@ -1,20 +1,3 @@
-"""How good is a finished run? Map quality, accuracy and consistency.
-
-Nothing here is graded, and nothing here feeds back into SLAM: it only looks at
-a finished run. The figures and the summary printed after every run both get
-their numbers from here, so the two always agree.
-
-Map quality answers the question the simulated ground truth makes possible --
-how many of the true landmarks the run saw ended up in the map exactly once,
-and how many map landmarks are duplicates or have no true counterpart at all.
-
-Duplicates are the signature of failed data association: a measurement of a
-landmark that is already in the map was not matched to it, and became a new
-landmark instead. Comparing these numbers between tuning sets tells you how much
-of the error is the front-end's, and how much is left for the models and the
-noise (Sec. 9.1).
-"""
-
 from __future__ import annotations
 
 import math
@@ -27,9 +10,7 @@ from scipy.stats import chi2
 from graphslam.data_association import NIS
 from graphslam.utils import pose2_tangent_errors, rotmat2, ssa
 
-# Map landmarks are matched to true landmarks one-to-one, and only within this
-# distance. It is deliberately generous: the whole map drifts with the
-# trajectory, so even a good landmark can sit a metre or more from the truth.
+# Matching radius for map and true landmarks; generous, since the whole map drifts.
 MATCH_DISTANCE_M = 3.0
 
 
@@ -112,8 +93,7 @@ def map_quality(
 # ---------------------------------------------------------------------------
 
 
-# Confidence level of every NEES/NIS bound and interval, as in the book's
-# example after (4.67).
+# Confidence level of every NEES/NIS bound and interval.
 CONFIDENCE = 0.95
 
 
@@ -217,9 +197,7 @@ def gnss_nis(
     if len(gnss) == 0:
         raise ValueError("At least one GNSS measurement is required.")
 
-    # A run cut short with --steps ends long before the GNSS log does. Samples
-    # outside the run's time span would all be matched to its first or last pose
-    # and show up as a huge, meaningless NIS, so leave them out.
+    # Ignore GNSS samples outside the run, e.g. after a --steps cut-off.
     in_run = (gnss[:, 0] >= poses_times[0]) & (gnss[:, 0] <= poses_times[-1])
     gnss = gnss[in_run]
     if len(gnss) == 0:
@@ -234,13 +212,10 @@ def gnss_nis(
 
 @dataclass(frozen=True)
 class RunSummary:
-    """The headline numbers of a run; ``None`` where the data set has no reference.
+    """The headline numbers of a run; ``None`` where the dataset has no reference.
 
-    The averages follow the book, (4.67): the pose ANEES is the mean NEES
-    (expected 3, the pose dimension) and the GNSS ANIS the mean NIS (expected 2).
-    The landmark NIS of a scan has 2 degrees of freedom per associated landmark,
-    which changes from scan to scan, so it is averaged per degree of freedom
-    instead (expected 1). Each average comes with its 95% interval.
+    Expected values: pose ANEES 3, GPS ANIS 2, landmark ANIS 1 per degree of
+    freedom. Each average comes with its 95% interval.
     """
 
     rmse_x_m: float | None = None

@@ -1,17 +1,5 @@
-"""
-SlamLogger — per-step diagnostics, snapshot saving, and offline reloading.
-
-Saves to:
-    <run_dir>/
-        metadata.json          ← scalar metadata
-        reference.npz          ← optional dataset references for plotting
-        steps.npz              ← per-step diagnostics (NaN for absent fields)
-        associations/
-            assoc_00050.npz    ← ragged association diagnostics for selected scans
-        snapshots/
-            snap_00050.npz     ← full state at step 50
-            snap_00100.npz     ← full state at step 100
-            snap_final.npz     ← full final state (always written by save())
+"""Saving and reloading a run directory: ``metadata.json``, ``steps.npz``,
+``associations/`` and ``snapshots/``.
 """
 from __future__ import annotations
 
@@ -221,7 +209,6 @@ class SlamLogger:
         path = Path(path)
         if not path.exists():
             raise FileNotFoundError(path)
-        # Could consider doing lazy loading, returning np.load() instead of dict
         return np.load(path, allow_pickle=False)
      
 
@@ -315,7 +302,6 @@ class SlamLogger:
         snap_dir = run_dir / "snapshots"
         if not snap_dir.exists():
             raise FileNotFoundError(snap_dir)
-        # TODO: handle memory concerns for large number snapshots
         paths = sorted(snap_dir.glob("snap_*.npz"))
         return [SlamLogger.load_snapshot(p) for p in paths]
 

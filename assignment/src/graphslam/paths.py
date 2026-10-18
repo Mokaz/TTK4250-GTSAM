@@ -1,10 +1,3 @@
-"""Where the data and the run outputs live.
-
-The data directory is looked up rather than hard-coded, so the code works
-whether you run from the handout root, from a subdirectory, or from a checkout
-that keeps the (large) data set one level up.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

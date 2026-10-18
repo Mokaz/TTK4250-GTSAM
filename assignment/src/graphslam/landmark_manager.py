@@ -1,9 +1,3 @@
-"""Landmark birth: when a repeated detection becomes a map landmark (M of N).
-
-Only :meth:`TentativeLandmark.is_confirmed` is graded: Task 1 (h). The rest of
-this file is given.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -13,9 +7,7 @@ from scipy.optimize import linear_sum_assignment
 
 from graphslam.config import SlamConfig
 
-# Sentinel cost for out-of-gate pairs in the assignment problem: large enough
-# that the solver only picks such a pair when forced, after which it is
-# rejected rather than used.
+# Cost for out-of-gate pairs: only picked when forced, and then rejected.
 _GATED_OUT_COST = 1e9
 
 
@@ -54,15 +46,8 @@ class TentativeLandmark:
         step: int,
         measurement: np.ndarray,
     ) -> None:
-        """Record a new supporting observation.
-
-        The position is kept as a running average. This is deliberately crude:
-        once the landmark is promoted, the graph re-estimates its position
-        properly from all of the supporting observations at once, so the only
-        job of this average is to be good enough to keep gating sensible.
-
-        At most one observation is recorded per time step, because the
-        association in :meth:`TentativeLandmarkManager._associate` is one-to-one.
+        """Record a supporting observation. The position is a running average, used
+        only for gating.
         """
         new_position = np.asarray(new_position, dtype=float).reshape(2)
         measurement = np.asarray(measurement, dtype=float).reshape(2)
@@ -113,15 +98,8 @@ def get_tentative_landmark_manager(config: SlamConfig) -> TentativeLandmarkManag
 
 
 class TentativeLandmarkManager:
-    """Holds tentative landmarks and promotes them when they are confirmed.
-
-    One time step looks like this:
-
-    1. Unassociated measurements are back-projected to world positions.
-    2. Each is matched to an existing tentative landmark, or spawns a new one.
-    3. Tentative landmarks that satisfy the M-of-N rule are handed back for
-       promotion into the graph.
-    4. Tentative landmarks that can no longer reach ``M`` in time are pruned.
+    """Holds tentative landmarks, promotes confirmed ones and prunes those that
+    can no longer reach ``M``.
     """
 
     def __init__(self, M: int, N: int, gate: float) -> None:
@@ -193,12 +171,8 @@ class TentativeLandmarkManager:
         return confirmed
 
     def _associate(self, measurement_positions: np.ndarray) -> np.ndarray:
-        """Match this step's measurements to existing tentative landmarks.
-
-        Solved as a one-to-one assignment minimising total Euclidean distance
-        (Hungarian algorithm), subject to the gate. Greedy per-measurement
-        matching would be order dependent: the first measurement to claim a
-        landmark wins even when a later one fits it better.
+        """Match measurements to tentative landmarks one-to-one (Hungarian
+        algorithm), within the gate.
         """
         num_measurements = measurement_positions.shape[0]
         matches = np.full(num_measurements, -1, dtype=int)

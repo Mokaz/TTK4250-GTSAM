@@ -1,11 +1,3 @@
-"""Front-end preprocessing: odometry and lidar (Sec. 9.1).
-
-Before anything reaches the factor graph it has to be turned into the two
-quantities the back-end understands: a relative pose with a covariance, and a
-list of range-bearing measurements. That conversion is the front-end, and the
-two graded functions here are its odometry half.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -53,7 +45,7 @@ def relative_pose(
         Duration of the interval [s].
     car : Car
         Vehicle geometry: ``car.H`` (centre line to encoder) and ``car.L``
-        (axle distance) [m]. Defaults to the Victoria Park vehicle.
+        (wheelbase) [m]. Defaults to the Victoria Park vehicle.
 
     Returns
     -------
@@ -165,10 +157,6 @@ def detect_trees(scan):
     L2 = len(ii2) + 1
     ii2u = np.append(ii2, L1 - 1)
     ii2 = np.insert(ii2 + 1, 0, 0)
-    # ii2u = int16([ ii2, L1 ])
-    # ii2  = int16([1, ii2+1 ])
-
-    # %ii2 , size(R1) ,
 
     R2 = R1[ii2]
     A2 = A1[ii2]

@@ -207,13 +207,8 @@ def plot_per_step_timing(
 
 
 def _has_clique_counts(n_support: np.ndarray | None) -> bool:
-    """Whether the support-clique counter actually produced anything.
-
-    ``ISAM2::jointMarginalSupportCliqueCount`` is not part of GTSAM 4.3, so on a
-    stock install ``num_support_cliques`` is logged as a constant zero. Plotting
-    it then gives a flat line and a Spearman rho over a constant input, which is
-    noise rather than a diagnostic. The panels using it are dropped unless a
-    patched build has filled them in.
+    """Whether ``num_support_cliques`` was logged. GTSAM 4.3 does not provide
+    it, so a stock install logs zeros.
     """
     if n_support is None:
         return False
@@ -359,21 +354,11 @@ def plot_pose_diagnostics(
     axes: plt.Axes | None = None,
     cov_frame: Literal["body", "world"] = "body",
 ) -> tuple[plt.Figure, plt.Axes]:
-    """Plot pose-component errors and/or pose covariance sigma envelopes.
+    """Plot x, y and heading errors over time, with 1, 2 and 3 sigma envelopes.
 
-    This function plots x, y, and heading diagnostics over time.
-
-    If poses and poses_gt are provided, component errors are plotted. For
-    cov_frame == "body", the error is the Pose2 tangent vector
-    Logmap(T_est.between(T_gt)); for cov_frame == "world", x/y are direct
-    world-frame component differences and yaw is wrapped.
-
-    If poses_covs is provided, marginal 1, 2, and 3 sigma covariance envelopes
-    are plotted.
-
-    If cov_frame == "body", the xy covariance is used as-is.
-    If cov_frame == "world", poses must be provided, and the xy covariance is
-    rotated into the world frame before extracting x/y standard deviations.
+    Errors need ``poses`` and ``poses_gt``; envelopes need ``poses_covs``.
+    ``cov_frame`` is ``"body"`` (tangent-space errors and covariance) or
+    ``"world"`` (world-frame x/y, covariance rotated into the world frame).
     """
 
     fig, axes = _ensure_ax(axes, figsize=(8, 5.2), nrows=3, ncols=1, sharex=True)
@@ -708,7 +693,7 @@ def plot_association(
     world_ax.grid(True, lw=0.4)
     world_ax.legend(fontsize=8)
    
-    ### MEAUSREMENT SPACE
+    ### MEASUREMENT SPACE
     if len(z_pred_deg) > 0:
         meas_ax.scatter(z_pred_deg[:, 0], z_pred_deg[:, 1], c="tomato", marker="x", s=45, label="Predicted")
 
@@ -750,8 +735,7 @@ def plot_landmark_nis(
 
     nis, dofs, steps = landmark_nis(diagnostics)
 
-    # Per scan, and averaged, per degree of freedom: the number of associated
-    # landmarks, and so the dimension of the NIS, changes from scan to scan.
+    # Per degree of freedom, since the number of associated landmarks varies.
     lower, upper = chi2_bounds(dofs)
     D = int(np.sum(dofs))
     anis_per_dof = np.sum(nis) / D

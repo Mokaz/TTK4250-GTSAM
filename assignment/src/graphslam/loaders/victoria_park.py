@@ -59,19 +59,12 @@ class VictoriaParkLoader:
         self.gnss_timestamps = raw_data["timeGps"].ravel() / 1000.0
 
     def _prepare_odometry_intervals(self):
-        """
-        Forward odometry convention:
-
-            u_k = (velocity[k], steering[k])
-
-        describes motion over:
-
-            [odo_timestamps[k], odo_timestamps[k + 1]]
+        """Odometry intervals: ``(velocity[k], steering[k])`` applies over
+        ``[odo_timestamps[k], odo_timestamps[k + 1]]``.
         """
         self.odo_interval_t0 = self.odo_timestamps[:-1]
         self.odo_interval_t1 = self.odo_timestamps[1:]
 
-        # Change below to [1:] for backward odometry convention
         self.odo_interval_velocity = self.odo_velocity[:-1]
         self.odo_interval_steering = self.odo_steering[:-1]
 
@@ -79,21 +72,7 @@ class VictoriaParkLoader:
             raise ValueError("Odometry timestamps must be strictly increasing.")
 
     def _odometry_between(self, t0: float, t1: float) -> list[WheelOdometry]:
-        """
-        Return odometry inputs clipped to [t0, t1].
-
-        Each returned input represents motion over a clipped interval:
-
-            [start_time, end_time]
-
-        with duration:
-
-            dt = end_time - start_time
-
-        using the forward convention:
-
-            u_k applies over [T_odo[k], T_odo[k+1]]
-        """
+        """Odometry inputs clipped to ``[t0, t1]``, each with its clipped ``dt``."""
         if t1 <= t0:
             return []
 
@@ -135,9 +114,7 @@ class VictoriaParkLoader:
 
         for lidar_idx in range(start_lidar_idx, stop_lidar_idx):
             if scan_step == 0:
-                # Anchor the first scan at the prior pose X(0). The vehicle is
-                # stationary during the first seconds, so the wheel odometry
-                # accumulated before the first scan is dropped without loss.
+                # The first scan sits at the prior pose X(0); the car is still standing.
                 odometry: list[WheelOdometry] = []
             else:
                 t0 = float(self.lsr_timestamps[lidar_idx - 1])
@@ -152,58 +129,6 @@ class VictoriaParkLoader:
             )
             scan_step += 1
 
-    # def iterate_synced(self, max_steps: int | None = None) -> Iterator[RawLidarStepInput]:
-    #     """
-    #     Iterate over LiDAR steps snapped to the preceding odometry sample.
-
-    #     This simpler synchronization uses complete odometry intervals only:
-    #     every LiDAR timestamp is matched to the latest odometry timestamp before
-    #     it, and the returned odometry spans between two consecutive matched
-    #     odometry timestamps. No partial odometry intervals are clipped.
-    #     """
-    #     preceding_odo_idx = np.searchsorted(
-    #         self.odo_timestamps,
-    #         self.lsr_timestamps,
-    #         side="right",
-    #     ) - 1
-
-    #     valid_lidar_indices = np.flatnonzero(preceding_odo_idx >= 0)
-    #     if valid_lidar_indices.size < 2:
-    #         return
-
-    #     first_valid_lidar_idx = int(valid_lidar_indices[0])
-    #     start_lidar_idx = first_valid_lidar_idx + 1
-    #     stop_lidar_idx = self.lsr_timestamps.size
-    #     scan_step = 0
-
-    #     if max_steps is not None:
-    #         stop_lidar_idx = min(stop_lidar_idx, start_lidar_idx + max_steps)
-
-    #     for lidar_idx in range(start_lidar_idx, stop_lidar_idx):
-    #         first_odo_idx = preceding_odo_idx[lidar_idx - 1]
-    #         last_odo_idx = preceding_odo_idx[lidar_idx]
-
-    #         odometry = [
-    #             WheelOdometry(
-    #                 velocity=float(v),
-    #                 steering=float(a),
-    #                 dt=float(t1 - t0),
-    #             )
-    #             for v, a, t0, t1 in zip(
-    #                 self.odo_interval_velocity[first_odo_idx:last_odo_idx],
-    #                 self.odo_interval_steering[first_odo_idx:last_odo_idx],
-    #                 self.odo_interval_t0[first_odo_idx:last_odo_idx],
-    #                 self.odo_interval_t1[first_odo_idx:last_odo_idx],
-    #             )
-    #         ]
-
-    #         yield RawLidarStepInput(
-    #             odometry=odometry,
-    #             scan=self.lsr_scans[lidar_idx],
-    #             scan_time=self.lsr_timestamps[lidar_idx],
-    #             scan_step=scan_step,
-    #         )
-    #         scan_step += 1
 
     def iterate_slam(
         self,
@@ -275,13 +200,8 @@ def find_gnss_outliers(
     max_speed_m_s: float = GNSS_MAX_SPEED_M_S,
     distance_margin_m: float = GNSS_OUTLIER_MARGIN_M,
 ) -> np.ndarray:
-    """
-    Return indices of isolated GNSS samples that violate a speed bound.
-
-    A sample is marked as an outlier when it is too far from both immediate
-    neighbours to be reachable at ``max_speed_m_s``, while those neighbours are
-    mutually plausible over their combined time interval. The margin absorbs
-    normal GNSS noise so short sampling intervals do not become too strict.
+    """Indices of isolated GNSS samples too far from both neighbours to be
+    reachable at ``max_speed_m_s``.
     """
     times = gnss[:, 0]
     positions = gnss[:, 1:3]

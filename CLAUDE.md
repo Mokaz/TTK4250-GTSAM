@@ -440,6 +440,14 @@ docstring is a one-line summary naming its task, plus Parameters and Returns
 (types, shapes, units, the [range, bearing] ordering). New hints go into the
 LaTeX; GTSAM API facts go into `docs/GTSAM.md`.
 
+The rest of the code follows the same rule (decided 18 Oct): most modules have
+no docstring at all, the few that do keep one or two lines saying what is
+tunable or graded, given-code
+docstrings state what a function does and its parameters, and comments are one
+line where needed. No theory, design rationale or book discussion in the code:
+students learn from the tasks and the book. Measured findings belong in this
+file, not in docstrings.
+
 Do not change code when asked only to review it. Do not touch the original
 EKF-SLAM LaTeX files. When a design decision affects the students' experience
 (scoring, what a task tests, what the shipped tuning demonstrates), surface it

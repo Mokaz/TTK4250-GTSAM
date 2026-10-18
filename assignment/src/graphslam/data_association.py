@@ -1,14 +1,3 @@
-"""Data association: JCBB.
-
-Nothing in this file is graded. It is worth reading anyway, because
-the quantity it consumes is the one you build in Task 1 (e) and (f): the
-innovation covariance ``S`` of the *whole local map jointly*, cross-covariances
-included. Individual compatibility only looks at the 2x2 diagonal blocks of
-``S``; joint compatibility is what the off-diagonal blocks buy you.
-
-The branch and bound search is described in Sec. 7.3.1 and 7.3.2 of the book.
-"""
-
 from __future__ import annotations
 
 from functools import lru_cache
@@ -72,8 +61,7 @@ def JCBB_association(
     ic = individual_compatibility(z, zbar, S)
     g2 = chi2.isf(1 - alpha_individual, 2)
 
-    # Associate the most confident measurements first (smallest best-match
-    # distance): good hypotheses are found early, which prunes harder.
+    # Most confident measurements first: good hypotheses early prune harder.
     order = np.argsort(np.amin(ic, axis=1))
     z_ordered = z[order]
     ic_ordered = ic[order]
@@ -103,8 +91,7 @@ def _jcbb_recursive(z, zbar, S, alpha_joint, g2, j, a, ic, abest):
     for i in usable[order]:
         a[j] = i
         if NIS(z, zbar, S, a) < chi2isf_cached(1 - alpha_joint, 2 * (n + 1)):
-            # Take this landmark out of circulation for the sub-tree, then
-            # restore it. The copy decouples the column we are blanking out.
+            # Remove this landmark for the sub-tree, then restore it.
             ici = ic[j:, i].copy()
             ic[j:, i] = np.inf
 
@@ -112,14 +99,8 @@ def _jcbb_recursive(z, zbar, S, alpha_joint, g2, j, a, ic, abest):
 
             ic[j:, i] = ici
 
-    # Leaving measurement j unassociated, but only if we can still win.
-    # Skipping j leaves at most M - j - 1 further pairings, so this explores the
-    # branch only if it could get strictly MORE pairings than the best so far:
-    # the bound from the original JCBB paper (Neira & Tardos, 2001). Sec. 7.3.2
-    # of the book says "at least as many", i.e. ``n + (M - j - 1) >= ...``,
-    # which also explores branches that could only tie and lets the NIS
-    # tie-break above choose between them. On Victoria Park both give the same
-    # associations, and the book's version costs about 50% more search time.
+    # Leave measurement j unassociated, only if that could still give strictly
+    # more pairings (Neira & Tardos, 2001; the book's Sec. 7.3.2 allows ties).
     if n + (M - j - 2) >= num_associations(abest):
         a[j] = -1
         abest = _jcbb_recursive(z, zbar, S, alpha_joint, g2, j + 1, a, ic, abest)
