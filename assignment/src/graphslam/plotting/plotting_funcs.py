@@ -725,6 +725,62 @@ def plot_association(
     return fig, axes
 
 
+def plot_wrong_association(
+    diagnostics: list[dict[str, np.ndarray]],
+    steps: dict[str, np.ndarray],
+    wrong_step: int,
+    window: int = 50,
+    loss_label: str | None = None,
+    axes: np.ndarray | None = None,
+) -> tuple[plt.Figure, np.ndarray]:
+    """Plot the landmark NIS (log scale) and the association counts around a forced wrong association.
+
+    ``steps`` is the per-step log of the run; ``window`` is the number of scan
+    steps shown on either side of ``wrong_step``; ``loss_label`` names the loss
+    on the landmark factors in the title.
+    """
+    fig, axes = _ensure_ax(
+        axes, figsize=(8, 4.5), nrows=2, ncols=1, sharex=True, gridspec_kw={"height_ratios": [1.6, 1]}
+    )
+    nis_ax, count_ax = axes
+    first, last = wrong_step - window, wrong_step + window
+
+    nis, dofs, nis_steps = landmark_nis(diagnostics)
+    lower, upper = chi2_bounds(dofs)
+    shown = (nis_steps >= first) & (nis_steps <= last)
+    x, values, lower, upper = nis_steps[shown], (nis / dofs)[shown], (lower / dofs)[shown], (upper / dofs)[shown]
+    # Break the lines at steps where nothing was associated, so the gap shows.
+    if len(x) > 2:
+        gaps = np.diff(x)
+        breaks = np.flatnonzero(gaps > np.median(gaps)) + 1
+        x, values, lower, upper = (np.insert(np.asarray(a, dtype=float), breaks, np.nan)
+                                   for a in (x, values, lower, upper))
+    nis_ax.semilogy(x, values, lw=1.0, color="steelblue", marker=".", ms=3, label="NIS per DOF")
+    nis_ax.semilogy(x, lower, lw=1.0, ls="--", color="orange", label=f"Lower {CONFIDENCE:.0%} bound")
+    nis_ax.semilogy(x, upper, lw=1.0, ls="--", color="tomato", label=f"Upper {CONFIDENCE:.0%} bound")
+    nis_ax.axhline(1, lw=1.0, ls=":", color="0.3", label="Expected value (1)")
+    nis_ax.set_ylabel("NIS per DOF")
+    loss = f" ({loss_label})" if loss_label else ""
+    nis_ax.set_title(f"Forced wrong association at step {wrong_step}{loss}: landmark NIS (log scale)")
+
+    scan = np.asarray(steps["scan_step"])
+    associated = np.asarray(steps["num_associated_measurement"])
+    total = associated + np.asarray(steps["num_unassociated_measurement"])
+    shown = (scan >= first) & (scan <= last)
+    count_ax.step(scan[shown], total[shown], where="mid", lw=1.0, ls=":", color="k", label="Measurements")
+    count_ax.step(scan[shown], associated[shown], where="mid", lw=1.4, color="steelblue", label="Associated")
+    count_ax.set_ylabel("Count")
+    count_ax.set_xlabel("Scan step")
+    count_ax.set_ylim(bottom=0)
+
+    for ax in axes:
+        ax.axvline(wrong_step, lw=1.0, ls=":", color="k")
+        ax.grid(True, lw=0.4)
+        ax.legend(loc="upper right", fontsize=8)
+    count_ax.set_xlim(first, last)
+    return fig, axes
+
+
 def plot_landmark_nis(
     diagnostics: list[dict[str, np.ndarray]],
     ax: plt.Axes | None = None,

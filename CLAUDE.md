@@ -152,7 +152,7 @@ guards the whole path for every route.
 
 ## Testing
 
-98 tests, ~10 s. The suite is also the grading instrument, so a test's failure
+101 tests, ~10 s. The suite is also the grading instrument, so a test's failure
 message is student-facing: write them that way.
 
 Every test of a graded function carries one pytest marker named after its part
@@ -166,7 +166,7 @@ catches typos.
 
 Run the handout through the suite after any change to the solution blocks — the
 expected result is that only the tests touching given code pass, currently 37
-of 98. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
+of 101. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
 check that no graded work hides behind a given-code test, not a scoring floor.
 
 `tests/test_plotting.py` exists because every other test runs with
@@ -277,12 +277,22 @@ run is the one Task 3 asks for; it diverges completely and takes twice as long.
   rate up to ~30 deg/s), and a kernel on the measurement factors only, which
   cannot tell an outlier from good measurements disagreeing with a bad
   odometry prediction. Task 4 dashboard: https://claude.ai/artifact/J95AASS8tjQZ9hxhKWPSJZ.
-  The relinearization settings lost their `TODO tune (Task 4)`. Students run
+  The relinearization settings lost their `TODO tune (Task 4)`. A run with
+  `inject_wrong_at_step` set also writes `wrong_association.pdf` (18 Oct): the
+  landmark NIS on a log scale and the association counts, +-50 steps around the
+  forced step. The stock `landmark_nis` plot cannot answer Task 4's NIS
+  question: the spike (1100 per DOF) flattens everything else, and nothing
+  showed that no measurement associates at steps 601-602. Its title names the
+  loss (least squares, or Huber with k), and the run summary prints the robust
+  kernel when one is on: a forgotten config edit gave Martin two identical
+  "Huber" and least-squares figures with nothing to tell them apart. Students run
   `configs/task4.yaml` (16 Oct): the shipped sim tuning plus
   `inject_wrong_at_step: 600`, no `TODO tune` comments; the text gives the
   command and has them edit `robust_kernel` to `huber` for the second run.
   `test_task4_config_is_the_sim_baseline_with_one_forced_mistake` keeps it in
-  step with `sim_default.yaml`: change both together.
+  step with `sim_default.yaml`: change both together. It ignores `robust_kernel`
+  and `huber_k`, which Task 4 has students edit (18 Oct; it used to require
+  `none`, so a student who followed the task failed the suite).
 - **Task 4 uses `association.inject_wrong_at_step` (decided 14 Oct).**
   Loosening the gates produces no mistake on either data set (checked up to
   1 - 1e-12), so the text now has students force one: at that scan step,

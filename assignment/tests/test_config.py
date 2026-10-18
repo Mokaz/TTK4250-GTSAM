@@ -25,13 +25,18 @@ def test_shipped_configs_load(name: str) -> None:
 
 
 def test_task4_config_is_the_sim_baseline_with_one_forced_mistake() -> None:
+    """Task 4 asks for the robust kernel to be switched on in task4.yaml; nothing else may differ."""
     task4 = SlamConfig.load(CONFIGS / "task4.yaml")
     baseline = SlamConfig.load(CONFIGS / "sim_default.yaml")
-    assert task4.association.inject_wrong_at_step == 600
-    assert task4.backend.robust_kernel == "none"
+    assert task4.association.inject_wrong_at_step == 600, "configs/task4.yaml should force the mistake at step 600"
 
     task4.association.inject_wrong_at_step = None
-    assert task4 == baseline, "configs/task4.yaml must match sim_default.yaml apart from the forced mistake"
+    task4.backend.robust_kernel = baseline.backend.robust_kernel
+    task4.backend.huber_k = baseline.backend.huber_k
+    assert task4 == baseline, (
+        "configs/task4.yaml should keep the tuning of configs/sim_default.yaml; "
+        "Task 4 only changes backend.robust_kernel"
+    )
 
 
 def test_default_config_matches_the_dataclass_defaults() -> None:

@@ -146,6 +146,80 @@ def test_the_landmark_nis_figure_reports_the_share_inside_its_bounds(plotted_run
     )
 
 
+@needs_data
+def test_plotter_methods_draw_into_the_axes_they_are_given(plotted_run: Path) -> None:
+    """Reports combine figures into panels, so every ``ax=`` must be honoured."""
+    from graphslam.plotter import SlamRunPlotter
+
+    plotter = SlamRunPlotter.from_run(plotted_run)
+    for name in ("plot_final_snapshot", "plot_pose_nees", "plot_landmark_nis", "plot_landmark_growth"):
+        fig, ax = plt.subplots()
+        _, drawn = getattr(plotter, name)(ax=ax)
+        assert drawn is ax, f"{name}(ax=...) drew into a new figure instead of the given axes"
+        plt.close("all")
+
+
+@pytest.fixture(scope="module")
+def wrong_association_run(tmp_path_factory) -> Path:
+    """The same short run, with one association forced wrong as in Task 4."""
+    if SIMULATED is None or not SIMULATED.exists():
+        pytest.skip("simulated data set not found")
+
+    from graphslam.loaders.simulated import SimulatedDataLoader
+
+    output_dir = tmp_path_factory.mktemp("wrong_association_run")
+    config = SlamConfig.load(ROOT / "configs" / "sim_default.yaml")
+    config.association.inject_wrong_at_step = 40
+
+    run_slam(
+        config=config,
+        dataset=SimulatedDataLoader(SIMULATED),
+        output_dir=output_dir,
+        num_steps=STEPS,
+        show_plots=False,
+        save_plots=True,
+    )
+    return output_dir
+
+
+@needs_data
+def test_a_forced_wrong_association_gets_its_own_figure(
+    plotted_run: Path, wrong_association_run: Path
+) -> None:
+    """Task 4 reads the NIS and the association counts around the forced step from this figure."""
+    from graphslam.plotter import SlamRunPlotter
+
+    assert (wrong_association_run / "figures" / "wrong_association.pdf").exists(), (
+        "a run with inject_wrong_at_step set should write wrong_association.pdf"
+    )
+    assert not (plotted_run / "figures" / "wrong_association.pdf").exists(), (
+        "a run without inject_wrong_at_step should not write wrong_association.pdf"
+    )
+
+    _, (nis_ax, count_ax) = SlamRunPlotter.from_run(wrong_association_run).plot_wrong_association()
+    assert "step 40" in nis_ax.get_title(), f"the title should name the forced step: {nis_ax.get_title()!r}"
+    assert nis_ax.get_yscale() == "log", "the NIS must be on a log scale, or the spike hides the rest"
+    assert count_ax.get_xlim() == (-10, 90), f"expected steps 40 +- 50, got {count_ax.get_xlim()}"
+    plt.close("all")
+
+
+@needs_data
+def test_the_loss_is_named_in_the_figure_and_the_summary(wrong_association_run: Path) -> None:
+    """Task 4 compares a least-squares run with a Huber run; both outputs must say which is which."""
+    from graphslam.plotter import SlamRunPlotter
+
+    plotter = SlamRunPlotter.from_run(wrong_association_run)
+    _, (nis_ax, _) = plotter.plot_wrong_association()
+    assert "least squares" in nis_ax.get_title(), f"title should name the loss: {nis_ax.get_title()!r}"
+    assert "robust kernel" not in str(plotter.summary()), "a least-squares run should not mention a kernel"
+
+    plotter.config.backend.robust_kernel = "huber"
+    _, (nis_ax, _) = plotter.plot_wrong_association()
+    assert "Huber, k = 1.345" in nis_ax.get_title(), f"title should name the loss: {nis_ax.get_title()!r}"
+    assert "robust kernel Huber, k = 1.345" in str(plotter.summary()), str(plotter.summary())
+    plt.close("all")
+
+
 def _nis_values(ax) -> np.ndarray:
     """The plotted NIS values: the first line, without the NaNs that break it at gaps."""
     values = np.asarray(ax.lines[0].get_ydata(), dtype=float)

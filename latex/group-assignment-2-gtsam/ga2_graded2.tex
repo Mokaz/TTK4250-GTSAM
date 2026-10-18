@@ -45,15 +45,16 @@ In Tasks \ref{q:task02} and \ref{q:task03} you will experiment with different se
 From the simulated data:
 \begin{itemize}
 	\item \pythoninline{final_snapshot}: the trajectory and the map against the ground truth, with the map-quality counts in the title.
-	\item \pythoninline{pose_diagnostics}: the \(x\), \(y\) and heading errors over time with their \(\pm 1\), 2 and \(3\sigma\) covariance envelopes, and their RMSE.
+	\item \pythoninline{pose_diagnostics}: the \(x\), \(y\) and heading errors with their \(\pm 1\), 2 and \(3\sigma\) envelopes and RMSE.
 	\item \pythoninline{pose_nees}: the pose NEES over time with its 95\% bounds and the share inside them, and the ANEES with its interval.
 	\item \pythoninline{landmark_nis}: the landmark NIS per degree of freedom over time with its 95\% bounds and the share inside them, and the ANIS with its interval.
+	\item \pythoninline{wrong_association} (Task~\ref{q:task04} only): the landmark NIS and the association counts around the forced step.
 \end{itemize}
 
 From Victoria Park, which has no ground truth:
 \begin{itemize}
 	\item \pythoninline{final_snapshot}: the trajectory and the map against the GPS.
-	\item \pythoninline{position_nis}: the NIS of the GPS positions over time with its 95\% bounds and the share inside them, and the ANIS with its interval.
+	\item \pythoninline{position_nis}: the NIS of the GPS positions, shown like the landmark NIS.
 	\item \pythoninline{landmark_nis}: as for the simulated data.
 	\item \pythoninline{landmark_growth}: the number of landmarks over time, which shows when data association starts to fail.
 \end{itemize}

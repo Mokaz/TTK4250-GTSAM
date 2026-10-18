@@ -32,6 +32,7 @@ from graphslam.plotting.plotting_funcs import (
     plot_position_nis,
     plot_landmark_growth,
     plot_landmark_nis,
+    plot_wrong_association,
     plot_landmarks_and_timing,
     plot_timing_vs_landmarks,
     plot_cumulative_timing,
@@ -158,6 +159,9 @@ class SlamRunPlotter:
                     gnss_rms_distance_m=float(np.sqrt(np.mean(np.sum(difference**2, axis=1)))),
                 )
 
+        if self.config.backend.robust_kernel != "none":
+            values.update(robust_kernel=self.config.backend.loss_label)
+
         return RunSummary(map_quality=self.map_quality(), **values)
 
     def plot_final_snapshot(self, ax = None, **kwargs) -> tuple[plt.Figure, plt.Axes]:
@@ -279,9 +283,23 @@ class SlamRunPlotter:
             return None
         
         fig, ax = plot_landmark_nis(
+            ax=ax,
             diagnostics=self.association,
         )
         return fig, ax
+
+    def plot_wrong_association(self, axes = None) -> tuple[plt.Figure, np.ndarray] | None:
+        wrong_step = self.config.association.inject_wrong_at_step
+        if wrong_step is None or not self.association:
+            return None
+
+        return plot_wrong_association(
+            axes        = axes,
+            diagnostics = self.association,
+            steps       = self.steps,
+            wrong_step  = wrong_step,
+            loss_label  = self.config.backend.loss_label,
+        )
     
     
 
@@ -291,6 +309,7 @@ class SlamRunPlotter:
         self._finish_figure( self.plot_pose_diagnostics(), name="pose_diagnostics", save=save, show=show, fmt="pdf" )
         self._finish_figure( self.plot_pose_nees(), name="pose_nees", save=save, show=show, fmt="pdf" )
         self._finish_figure( self.plot_landmark_nis(), name="landmark_nis", save=save, show=show, fmt="pdf" )
+        self._finish_figure( self.plot_wrong_association(), name="wrong_association", save=save, show=show, fmt="pdf" )
         self._finish_figure( self.plot_position_nis(), name="position_nis", save=save, show=show, fmt="pdf" )
         self._finish_figure( self.plot_cumulative_timing(), name="timing_cumulative", save=save, show=show, fmt="pdf" )
         self._finish_figure( self.plot_per_step_timing(), name="timing_per_step", save=save, show=show, fmt="pdf" )

@@ -1,12 +1,12 @@
 \titledquestion{One bad association}
 \label{q:task04}
-In this short task, we will look at what happens when a data association is wrong, and how a robust loss function can help. The experiment is quick to run, and its discussion should be included in the report as one figure and a paragraph.
+In this short task, we will look at what happens when a data association is wrong, and how a robust loss function can help. The experiment is quick to run, and its discussion should fit in one figure and a few short paragraphs.
 
 The config \pythoninline{configs/task4.yaml} sets \pythoninline{inject_wrong_at_step: 600} under \pythoninline{association}, which re-pairs one measurement with the wrong landmark at step 600. Everything else is the same as in \pythoninline{configs/sim_default.yaml}, the default tuning from Task~\ref{q:task02}. Run it with
 \begin{center}
     \pythoninline{run_sim --config configs/task4.yaml --output-dir runs/sim/task4}
 \end{center}
-and compare it with your baseline run from Task~\ref{q:task02}: explain what this single wrong association does to the trajectory and the map, using the error values and landmark counts from the run summary. How does the NIS behave at step 600 and in the steps after it, and why?
+and compare it with your baseline run from Task~\ref{q:task02}: explain what this single wrong association does to the trajectory and the map, using the error values and landmark counts from the run summary. Besides the usual figures, this run saves \pythoninline{wrong_association.pdf}, which shows the landmark NIS on a log scale and the number of associated measurements around step 600. How does the landmark NIS behave at step 600 and in the steps after it, and why?
 
 The Huber loss is a robust loss function (GTSAM calls it a robust kernel, hence the config name) that is quadratic for small errors and linear for large ones:
 \[
@@ -28,6 +28,6 @@ Edit \pythoninline{configs/task4.yaml}: set \pythoninline{backend.robust_kernel:
 \begin{center}
     \pythoninline{run_sim --config configs/task4.yaml --output-dir runs/sim/task4_huber}
 \end{center}
-Explain how this changes the cost function (9.6) for the wrong measurement, and why that helps.
+Explain how this changes the cost function (9.6) for the wrong measurement, and why that helps; the two runs' \pythoninline{wrong_association} figures show the difference.
 
 Finally, compare with EKF-SLAM (Sec.\ 7.2): what are your options for recovering from a wrong association in each of the two frameworks?

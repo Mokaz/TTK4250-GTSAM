@@ -230,9 +230,12 @@ class RunSummary:
     sigma_gnss_m: float | None = None
     gnss_rms_distance_m: float | None = None
     map_quality: MapQuality | None = None
+    robust_kernel: str | None = None
 
     def __str__(self) -> str:
         parts = []
+        if self.robust_kernel is not None:
+            parts.append(f"robust kernel {self.robust_kernel}")
         if self.rmse_x_m is not None:
             parts.append(
                 f"RMSE x {self.rmse_x_m:.2f} m, y {self.rmse_y_m:.2f} m, yaw {self.rmse_yaw_deg:.2f} deg"

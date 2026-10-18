@@ -224,6 +224,13 @@ class BackendConfig:
         if self.huber_k <= 0:
             raise ValueError(f"huber_k must be positive, got {self.huber_k}")
 
+    @property
+    def loss_label(self) -> str:
+        """The loss on the landmark factors, for titles and the run summary."""
+        if self.robust_kernel == "huber":
+            return f"Huber, k = {self.huber_k:g}"
+        return "least squares"
+
 
 @dataclass
 class VictoriaParkConfig:
