@@ -27,7 +27,7 @@ this environment.
 ## Accept or remove the Anaconda channel Terms of Service
 
 On a fresh Miniconda, the very first `conda env create` stops before doing
-anything (on Linux the list has no `msys2` line):
+anything (on Linux and macOS the list has no `msys2` line):
 
 ```
 CondaToSNonInteractiveError: Terms of Service have not been accepted for the
@@ -60,12 +60,14 @@ conda config --set channel_priority strict
 conda config --show channels
 ```
 
-Miniconda lists `defaults` in two places, your own settings and its install
+Miniconda can list `defaults` in two places, your own settings and its install
 folder's, which is why there are two `--remove` lines. If either one fails with
 `CondaKeyError: 'channels': value 'defaults' not present in config`, it was
-already absent there; carry on. The last command must print `conda-forge` and
-nothing else. After this the Terms of Service prompt does not appear, because
-conda never consults Anaconda's channels.
+already absent there; carry on. If the `--system` line fails with a permission
+error (Miniconda installed for all users), run it from an administrator
+terminal, or accept the terms instead. The last command must list `conda-forge`
+and no other channel. After this the Terms of Service prompt does not appear,
+because conda never consults Anaconda's channels.
 
 ## Check the install
 

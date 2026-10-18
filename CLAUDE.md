@@ -94,6 +94,8 @@ students hit them.
 Tested on Linux 18 Oct (fresh Miniconda 26.9.3, the release zip): the install
 folder's own `.condarc` lists `defaults`, so removing it from the user file
 alone still hits the ToS error; INSTALL.md now removes it with `--system` too.
+Windows Miniconda does the same (`miniconda3\.condarc` lists `defaults` on
+Martin's machine), so the `--system` line is needed there as well.
 The `.sh` installer's "initialize conda?" defaults to no, which leaves `conda`
 off the path; INSTALL.md says to answer yes. Otherwise everything matched
 Windows: 37 of 101 on the empty handout, and with the solution the sim
