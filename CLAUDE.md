@@ -91,6 +91,15 @@ Anaconda channels are accepted or removed. The removed details (the `__win`
 solve failure, the AutoRun hook, activation by full path) are in git history if
 students hit them.
 
+Tested on Linux 18 Oct (fresh Miniconda 26.9.3, the release zip): the install
+folder's own `.condarc` lists `defaults`, so removing it from the user file
+alone still hits the ToS error; INSTALL.md now removes it with `--system` too.
+The `.sh` installer's "initialize conda?" defaults to no, which leaves `conda`
+off the path; INSTALL.md says to answer yes. Otherwise everything matched
+Windows: 37 of 101 on the empty handout, and with the solution the sim
+baseline, both Task 4 runs and the full Victoria Park run reproduced the
+Measured numbers exactly, headless runs included.
+
 ## The editable-install trap — read this before debugging anything
 
 `assignment/` and `handout/` both install as the package `graphslam`, and

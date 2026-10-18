@@ -12,6 +12,12 @@ Identical on Windows, Linux and macOS. Install
 not the full Anaconda Distribution. GTSAM comes from conda-forge, because PyPI
 has no Windows wheel for it; `environment.yml` sets the channel for you.
 
+On Linux and macOS, the shell (`.sh`) installer ends by asking whether to
+initialize conda, and its default is **no**. Answer `yes`. If you pressed Enter,
+`conda` is not on your path and `conda info` says "command not found"; run
+`~/miniconda3/bin/conda init` (or wherever you installed it) and open a new
+terminal.
+
 ## If you already have Anaconda
 
 Run `conda info` before anything else. You want `conda version` at 25 or newer:
@@ -21,7 +27,7 @@ this environment.
 ## Accept or remove the Anaconda channel Terms of Service
 
 On a fresh Miniconda, the very first `conda env create` stops before doing
-anything:
+anything (on Linux the list has no `msys2` line):
 
 ```
 CondaToSNonInteractiveError: Terms of Service have not been accepted for the
@@ -49,12 +55,17 @@ assignment uses nothing from them — every package comes from conda-forge, and
 ```sh
 conda config --add channels conda-forge
 conda config --remove channels defaults
+conda config --system --remove channels defaults
 conda config --set channel_priority strict
+conda config --show channels
 ```
 
-If the middle command complains that `defaults` is not in the `channels` key, it
-was already absent; carry on. After this the Terms of Service prompt does not
-appear, because conda never consults Anaconda's channels.
+Miniconda lists `defaults` in two places, your own settings and its install
+folder's, which is why there are two `--remove` lines. If either one fails with
+`CondaKeyError: 'channels': value 'defaults' not present in config`, it was
+already absent there; carry on. The last command must print `conda-forge` and
+nothing else. After this the Terms of Service prompt does not appear, because
+conda never consults Anaconda's channels.
 
 ## Check the install
 
