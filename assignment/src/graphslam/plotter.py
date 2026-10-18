@@ -259,7 +259,7 @@ class SlamRunPlotter:
 
     def plot_position_nis(self, ax = None) -> tuple[plt.Figure, plt.Axes] | None:
         if self.gnss is None:
-            print("No GNSS reference found, skipping position NIS plot.")
+            print("No GPS reference found, skipping the GPS NIS plot.")
             return None
 
         fig, ax = plot_position_nis(

@@ -107,7 +107,7 @@ def plot_estimate(
             draw_landmark_covariances(ax, landmarks, landmarks_cov, alpha=0.3, zorder=3)
 
     if gnss is not None and len(gnss) > 0:
-        ax.scatter(gnss[:, 1], gnss[:, 2], c="gold", marker=".", alpha=0.6, label="GNSS", zorder=1)
+        ax.scatter(gnss[:, 1], gnss[:, 2], c="gold", marker=".", alpha=0.6, label="GPS", zorder=1)
 
     ax.set_title(kwargs["title"])
     ax.set_xlabel(kwargs["x_label"])

@@ -10,12 +10,12 @@
 % ga2_graded2_student.tex defines \studentversion and builds this file without the solutions.
 \ifdefined\studentversion\else\printanswers\fi
 \assignmentnr{2}
-\deadline{Tuesday {3}. November 23:59}
+\deadline{Sunday {8}. November 23:59}
 
 \begin{document}
-{\bf Hand in:} \emph{Tuesday {3}. November 23:59} on Canvas.
+{\bf Deadline:} \emph{Sunday {8}. November 23:59} on Canvas.
 
-\textbf{Groups size:} This assignment can be solved in groups of two or three. You are allowed to complete the assignment on your own if you want, but we advice you to solve it in groups as we believe that group discussions are important. Via Canvas you should also be able to see if there are groups with open spots that you could contact. It is okay to discuss the assignment with other groups, but each group should write an individual report.
+\textbf{Group size:} This assignment can be solved in groups of two or three. You are allowed to complete the assignment on your own if you want, but we advise you to solve it in groups as we believe that group discussions are important. Via Canvas you should also be able to see if there are groups with open spots that you could contact. It is okay to discuss the assignment with other groups, but each group should write an individual report.
 
 \textbf{Group signup:} You find the group signup under \texttt{People} $\rightarrow$ \texttt{Groups} $\rightarrow$ \texttt{GA2 group} in the menu on the left on Canvas. You and your group should sign up in the same group.
 
@@ -33,7 +33,7 @@ For the report you are limited to 1300 words and a total of 7 pages. Figure capt
 In the report we require you to clearly answer Task \ref{q:task02}, \ref{q:task03} and \ref{q:task04}. As the report is short you can skip the introduction and conclusion.
 You can assume the person reading the report has good knowledge of the subject.
 You can simply refer to equations and algorithms in the book when what you want to say is already stated there.
-Ex: "Given what's stated in (12.34) and equation (56.78) in the book the oscillations in Figure 9 are expected" (When refering to equations, figures etc. you should make it clear if you are refering to equations, figures etc. in the book or report).
+Ex: "Given what's stated in (12.34) and equation (56.78) in the book the oscillations in Figure 9 are expected" (When referring to equations, figures etc. you should make it clear if you are referring to equations, figures etc. in the book or report).
 
 The goal of the report is to show that you understand the code and the theory behind it by presenting and discussing the plots and results. Remember to argue for your claims and explain your reasoning: a statement that is right but not explained does not show understanding.
 Ex: If you write "These parameters gave bad results", you should also include something like "as can be seen by the high RMSE values in Figure 9".
@@ -66,12 +66,12 @@ Answers and analysis should connect theory and results to the real world, and sh
 Other plots, numbers, and considerations are welcome too, but what to show is \emph{up to you} to decide.
 Try to connect the results on the simulated data to the results of the real data where it is possible.
 
-If you have any questions please make a post on the GA2 discussion thread on Canvas and we will try to answer them as soon as possible or contact the student assistants during the excise class.
+If you have any questions please make a post on the GA2 discussion thread on Canvas and we will try to answer them as soon as possible or contact the student assistants during the exercise class.
 
 \noindent\makebox[\linewidth]{\rule{\textwidth}{0.4pt}}
 
 \section*{Some background on the template code}
-The template code is a trimmed-down version of a factor graph SLAM system built on \href{https://gtsam.org}{GTSAM}, the library referred to in Sec.\ 9.5 of the book. GTSAM provides the back-end: it holds the factor graph, maintains the Bayes tree, solves for the MAP estimate incrementally with iSAM2, and recovers marginal covariances from it. Everything around that is the front-end: turning odometry and lidar data into factors, predicting the measurements and their innovation covariance, deciding which measurement belongs to which landmark, and when a new landmark is born. Data association itself (JCBB) is given, the factors and the quantities it relies on are yours to implement in Task~\ref{q:task01}.
+The template code is a trimmed-down version of a factor graph SLAM system built on \href{https://gtsam.org}{GTSAM}, the library referred to in Sec.\ 9.5 of the book. GTSAM provides the back-end: it holds the factor graph, maintains the Bayes tree, solves for the MAP estimate incrementally with iSAM2, and recovers marginal covariances from it. Everything around that is the front-end: turning odometry and lidar data into factors, predicting the measurements and their innovation covariance, deciding which measurement belongs to which landmark, and when a new landmark is born. Data association itself (JCBB) is given; the factors and the quantities it relies on are yours to implement in Task~\ref{q:task01}.
 
 Set up the environment from the handout folder with
 \begin{center}
@@ -102,6 +102,7 @@ The files handed out are:
 	\input{ga2_task02_run_sim.tex}
 	\breaknoans
 	\input{ga2_task03_run_real.tex}
+	\breaknoans
 	\input{ga2_task04_experiments.tex}
 \end{questions}
 \end{document}

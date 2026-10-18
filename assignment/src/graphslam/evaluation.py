@@ -245,11 +245,11 @@ class RunSummary:
                 f"{_expected(1, self.landmark_anis_interval)}"
             )
         if self.gnss_rms_distance_m is not None:
-            parts.append(f"RMS distance to GNSS {self.gnss_rms_distance_m:.2f} m")
+            parts.append(f"RMS distance to GPS {self.gnss_rms_distance_m:.2f} m")
         if self.gnss_anis is not None:
             parts.append(
-                f"GNSS ANIS {self.gnss_anis:.2f} {_expected(2, self.gnss_anis_interval)}, "
-                f"GNSS sigma {self.sigma_gnss_m:g} m"
+                f"GPS ANIS {self.gnss_anis:.2f} {_expected(2, self.gnss_anis_interval)}, "
+                f"GPS sigma {self.sigma_gnss_m:g} m"
             )
 
         lines = []

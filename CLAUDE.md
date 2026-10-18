@@ -165,7 +165,7 @@ another graded function. Given-code tests in the graded files are marked
 catches typos.
 
 Run the handout through the suite after any change to the solution blocks — the
-expected result is that only the tests touching given code pass, currently 38
+expected result is that only the tests touching given code pass, currently 37
 of 98. The assignment is pass/fail (decided 2 Oct 2026), so this is a sanity
 check that no graded work hides behind a given-code test, not a scoring floor.
 

@@ -1,8 +1,8 @@
 # TTK4250 Group Assignment 2 — Factor graph SLAM
 
 Landmark SLAM on a factor graph, solved with GTSAM's iSAM2 back-end and a JCBB
-front-end, on the same two data sets as before: a simulated one with ground
-truth, and the Victoria Park lidar data set.
+front-end, on two datasets: a simulated one with ground truth, and the Victoria
+Park lidar dataset.
 
 > **This directory is the reference solution**, not the handout. Generate the
 > student version with `python tools/make_handout.py --out ../handout`.
@@ -87,14 +87,14 @@ logger and the plotting are given.
 ```text
 environment.yml   the conda environment; this is the supported setup
 configs/          run configurations; everything marked "TODO tune" is yours
-data/             simulated and Victoria Park data sets
+data/             simulated and Victoria Park datasets
 docs/             INSTALL.md (setup) and GTSAM.md (the GTSAM calls you need)
 src/graphslam/
   preprocessing.py     front-end: odometry and lidar          (a, b)
   factor_graph.py      factors, measurement model, covariance (c-g)
   landmark_manager.py  landmark birth, M-of-N                 (h)
   data_association.py  JCBB                                   given
-  evaluation.py        map quality against the true landmarks given
+  evaluation.py        NEES, NIS, map quality, run summary     given
   slam.py              the main loop                          given
   loaders/             dataset adapters                       given
   plotting/, plotter.py, logger.py                            given
@@ -102,18 +102,6 @@ tests/            the graded test suite
 typings/          GTSAM type stubs, so your editor can show its signatures
 tools/            handout generation and create_handin.py
 ```
-
-## Two things worth knowing before you start
-
-**Ordering.** Measurements are `[range, bearing]` everywhere in this code base.
-GTSAM's `BearingRangeFactor2D` wants bearing first. Getting this backwards
-produces a system that runs and looks plausible.
-
-**Frames.** The covariance GTSAM reports for a `Pose2` lives in the tangent
-space at the current estimate, and so do the Jacobians from `Pose2.range` and
-`Pose2.bearing`. Use them together and you are consistent; mix either with a
-hand-derived `d/d[x, y, theta]` and you are not. This also applies when you
-compute NEES — see `graphslam.utils.pose2_tangent_error`.
 
 ## Editor support
 
@@ -149,7 +137,7 @@ Summary: RMSE x 0.72 m, y 0.80 m, yaw 1.18 deg | pose ANEES 8.37 (expected 3, 95
 
 The numbers are the ones the figures show. The averages follow the book's
 (4.67): the pose ANEES is the mean NEES (expected 3, the pose dimension) and on
-Victoria Park the GNSS ANIS is the mean NIS (expected 2). The landmark NIS of a
+Victoria Park the GPS ANIS is the mean NIS (expected 2). The landmark NIS of a
 scan has two degrees of freedom per associated landmark, which changes from
 scan to scan, so it is averaged per degree of freedom instead (expected 1).
 Every average comes with its 95% interval, and every per-step bound in the
